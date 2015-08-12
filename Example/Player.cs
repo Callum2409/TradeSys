@@ -27,11 +27,15 @@ public class Player : MonoBehaviour
 	Vector2 scrollPos = Vector2.zero;
 	public float saleP = 0.7f;//this is the % of the normal price that the trade post will buy items at. Should be > 0 and < 1
 	internal GameObject focus;//this is set when an object using the HitMe script, or the code within it
+	public float collectionDistance = 2f;
+	Collider[] nearby;
+	string pickup = "";//use this so that if an item is collected, it will be displayed
+	float displayTimer;//used so that after a certain amount of time, the message will go away
 	
 	void Start ()
 	{//set up the variables that will be used throughout
 		controller = GameObject.Find ("Controller").GetComponent<Controller> ();
-		cargo = new int[controller.goods.Count];
+		cargo = new int[controller.goodsArray.Length];
 		//the cargo is stored as an int[] as this makes it easier to get the currently carried cargo
 		spaceRemaining = cargoSpace;//the player at the start is not carrying anything, so the remaining will be 
 		//the max space, this is done here because it means that it does not need to be set twice in the inspector
@@ -53,31 +57,60 @@ public class Player : MonoBehaviour
 			//this is to move and rotate the player
 			this.transform.Rotate (new Vector3 (Input.GetAxisRaw ("Vertical") * 2, 
 					Input.GetAxisRaw ("Horizontal") * 2, 0));
-			this.transform.Translate (Vector3.forward * 0.05f * Time.timeScale);
+			this.transform.Translate (Vector3.forward * 0.15f * Time.timeScale);
 			
 			if (Input.GetKey (KeyCode.Space)) //if pressing space, pause. Will be unpaused when in the shop
 				Time.timeScale = 0;
 			else
 				Time.timeScale = 1;
-		}else 
+		} else 
 			Time.timeScale = 1;
 		
 		if (Input.GetKeyUp (KeyCode.Escape))
 			focus = null;//if the player presses escape, then deslect and hide trader info
 		
 		enter = CheckPos ();//will now check if the player is close to any trade post
+		PickupCheck ();
+		
+		if (Time.timeSinceLevelLoad - displayTimer > 3)
+			pickup = "";
 	}
 	
 	bool CheckPos ()
 	{//needs to go through each trade post, and check the distance, if close, will return true indicating it is near, and will
 		//set nearPost
 		for (int p = 0; p<controller.posts.Count; p++) {
-			if (Vector3.Distance (this.transform.position, controller.posts [p].transform.position) < 3) {//check the distance
+			if (Vector3.Distance (this.transform.position, controller.posts [p].transform.position) < 10) {//check the distance
 				nearPost = controller.posts [p];//get the correct trade post
 				return true;
 			}
 		}//will return false if it has gone through all of the posts and is not close to any
 		return false;
+	}
+	
+	void PickupCheck ()
+	{
+		nearby = Physics.OverlapSphere (this.transform.position, collectionDistance);//check all items that are within collection range
+		for (int n = 0; n<nearby.Length; n++) {
+			if (nearby [n].tag == "Item") {//need to check that each one is an item
+				int itemNo = controller.spawned.FindIndex (x => x.item == nearby [n].gameObject);//get the location of the spawned item in the spawned list
+				int cargoNo = controller.spawned [itemNo].goodID;//get the cargoID
+				if (spaceRemaining >= controller.goods [cargoNo].mass) {//check there is enough space to collect the item
+					cargo [cargoNo]++;//add to cargo
+					spaceRemaining -= controller.goods [cargoNo].mass;//decrease space remaining
+					controller.spawned.RemoveAt (itemNo);//remove the item from the spawned list
+					Destroy (nearby [n].gameObject);//destroy the object
+					
+					pickup = "You collected " + controller.goods [cargoNo].name;//display that something was collected
+					
+					for (int t = 0; t < controller.traderScripts.Count; t++)//need to go through all the traders and check nearest so that none are heading
+						//for the item that has been picked up;
+						controller.traderScripts [t].CheckNearest ();
+				}else
+				pickup = "Could not collect item. Not enough space in hold.";//not enough space, so display
+				displayTimer = Time.timeSinceLevelLoad;//start the timer. this is here so that it does not need to be duplicated
+			}
+		}
 	}
 	#endregion
 	void OnGUI ()
@@ -126,9 +159,9 @@ public class Player : MonoBehaviour
 				GUI.Label (new Rect (420, s * 30, 250, 30), "Number available: " + toShow [s].number);//show the number the post has
 				GUI.Label (new Rect (680, s * 30, 250, 30), "You have: " + cargo [s]);//display the number the player has.
 				//this is where it is easier to have all the items in an array because then they will automatically be 0 rather than have to check a (probably unsorted) list
-				string mass = controller.goods [s].mass.ToString ();//the mass is added to a string because if there are no units, then display normally
-				if (controller.units.Count > 0 && controller.units.Count - 1 >= controller.goods [s].unit)//need to check that units can be used, and the units set in the controller still exist
-					mass = (controller.goods [s].mass / controller.units [controller.goods [s].unit].min).ToString () + controller.units [controller.goods [s].unit].suffix;
+				string mass = controller.goodsArray [s].mass.ToString ();//the mass is added to a string because if there are no units, then display normally
+				if (controller.units.Count > 0 && controller.units.Count - 1 >= controller.goodsArray [s].unit)//need to check that units can be used, and the units set in the controller still exist
+					mass = (controller.goodsArray [s].mass / controller.units [controller.goodsArray [s].unit].min).ToString () + controller.units [controller.goodsArray [s].unit].suffix;
 				//line above converts the mass which was as a decimal into an integer which can then be displayed with the 
 				//units. e.g. 1g in the controller may have been 0.000001, but we dont want to display it as this, so the 
 				//mass of the item is divided by the minimum required to have a certain unit, so here, would display as 1 instead
@@ -141,9 +174,9 @@ public class Player : MonoBehaviour
 				//next time otherwise will just quit again
 				
 				if (eBS == 1 && GUI.Button (new Rect (1100, s * 30, 50, 30), "Buy")) {//if buying
-					if (cash >= toShow [s].price && spaceRemaining >= controller.goods [s].mass && toShow [s].number > 0) {
+					if (cash >= toShow [s].price && spaceRemaining >= controller.goodsArray [s].mass && toShow [s].number > 0) {
 						//line above checks if there is enough cash, cargo space and number available to make a sale
-						spaceRemaining -= controller.goods [s].mass;//reduce the space remaining
+						spaceRemaining -= controller.goodsArray [s].mass;//reduce the space remaining
 						cash -= toShow [s].price;//pay for the item
 						cargo [s]++;//add the item to the cargo
 						toShow [s].number--;//reduce the number available at the trade post
@@ -152,7 +185,7 @@ public class Player : MonoBehaviour
 				}
 				if (eBS == 2 && GUI.Button (new Rect (1100, s * 30, 50, 30), "Sell")) {//if selling
 					if (cargo [s] > 0) {//check that it is possible to sell an item to the trade post
-						spaceRemaining += controller.goods [s].mass;//get the cargo space back
+						spaceRemaining += controller.goodsArray [s].mass;//get the cargo space back
 						cash += (int)(toShow [s].price * saleP);//get paid for the item, but is a proportion of the normal price
 						cargo [s]--;//reduce the number of the cargo
 						toShow [s].number++;//increase the stock count at the trade post
@@ -171,24 +204,25 @@ public class Player : MonoBehaviour
 				Trader trader = focus.GetComponent<Trader> (); //This is getting the trader script of the clicked trader. The focus is just a GameObject
 				List<NoType> rows = trader.trading;//get all of the cargo items to display
 				int rowCount = rows.Count;//get the number of rows
-				GUI.Label (new Rect (10, 30, 330, 30), "Target post: " + trader.targetPost);//show target post
-				GUI.Label (new Rect (10, 60, 330, 30), "Cargo space: " + trader.cargoSpace);//show cargo space
-				GUI.Label (new Rect (10, 90, 330, 30), "Space remaining: " + trader.spaceRemaining.ToString ("f1"));//show the space remaining to 1dp
+				GUI.Label (new Rect (10, 30, 330, 30), "Target: " + trader.target);//show target, post or item
+				GUI.Label (new Rect (10, 60, 330, 30), "Final Post: " + trader.finalPost);//show final post
+				GUI.Label (new Rect (10, 90, 330, 30), "Cargo space: " + trader.cargoSpace);//show cargo space
+				GUI.Label (new Rect (10, 120, 330, 30), "Space remaining: " + trader.spaceRemaining.ToString ("f1"));//show the space remaining to 1dp
 				if (rowCount > 0) {//if the trader is carrying something, display
-					GUI.Label (new Rect (10, 120, 280, 30), "Trading");
-					scrollPos = GUI.BeginScrollView (new Rect (10, 150, 330, Screen.height - 70), scrollPos, new Rect (0, 0, 310, rowCount * 30));
+					GUI.Label (new Rect (10, 150, 280, 30), "Trading");
+					scrollPos = GUI.BeginScrollView (new Rect (10, 180, 330, Screen.height - 70), scrollPos, new Rect (0, 0, 310, rowCount * 30));
 					//line above uses a scroll view just in case the trader is carrying many different items
 					for (int r = 0; r<rowCount; r++) {//go through all of the carrying items and display
-						GUI.Label (new Rect (0, r * 30, 30, 30), controller.goods [rows [r].goodID].name);//show the item name
+						GUI.Label (new Rect (0, r * 30, 30, 30), controller.goodsArray [rows [r].goodID].name);//show the item name
 						GUI.Label (new Rect (50, r * 30, 120, 30), "Number: " + rows [r].number);//show the number
 						
 						string unit = "";//set the string to display the unit to be blank
-						string mass = controller.goods [trader.trading [r].goodID].mass.ToString ();//get the standard mass
+						string mass = controller.goodsArray [trader.trading [r].goodID].mass.ToString ();//get the standard mass
 						for (int u = 0; u<controller.units.Count; u++) {//need to cycle through the units and find the correct one
-							if (controller.goods [trader.trading [r].goodID].mass >= controller.units [u].min && 
-								controller.goods [trader.trading [r].goodID].mass < controller.units [u].max) {
+							if (controller.goodsArray [trader.trading [r].goodID].mass >= controller.units [u].min && 
+								controller.goodsArray [trader.trading [r].goodID].mass < controller.units [u].max) {
 								unit = controller.units [u].suffix;//if the mass fits between the specified unit values, then get the suffix
-								mass = Mathf.RoundToInt ((float)controller.goods [trader.trading [r].goodID].mass / controller.units [u].min).ToString ();
+								mass = Mathf.RoundToInt ((float)controller.goodsArray [trader.trading [r].goodID].mass / controller.units [u].min).ToString ();
 								//show the mass, but round this up so that lots of decimals dont need to be shown
 							}
 						}
@@ -197,10 +231,11 @@ public class Player : MonoBehaviour
 					}
 					GUI.EndScrollView ();
 				} else {//if the trader is not carrying anything, then is moving to a different post
-					GUI.Label (new Rect (10, 120, 330, 30), "Moving to a different post");
+					GUI.Label (new Rect (10, 150, 330, 30), "Moving to a different post");
 				}
 			}
 			#endregion
+			GUI.Label (new Rect (10, Screen.height - 50, 500, 30), pickup);//display that item was collected
 		}
-	}	
+	}
 }

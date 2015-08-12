@@ -2,16 +2,22 @@ using UnityEngine;
 using UnityEditor;
 using System.Collections.Generic;
 using System;
+using System.IO;
 
 [CustomEditor(typeof(Controller))]
 public class ControllerEditor : Editor
 {
 	Controller controller;
 	GameObject[] posts;
+	TradePost[] postScripts;
+	GameObject[] spawners;
+	string[] directories;
 	
 	void Awake ()
 	{
 		posts = GameObject.FindGameObjectsWithTag ("Trade Post");
+		postScripts = new TradePost[posts.Length];
+		spawners = GameObject.FindGameObjectsWithTag ("Spawner");
 		controller = (Controller)target;
 		
 		while (controller.showSmallG.Count != controller.goods.Count) {
@@ -20,42 +26,79 @@ public class ControllerEditor : Editor
 			} else {
 				controller.showSmallG.Add (false);
 			}
-		}
+		}//while showing each good not correct length
 		while (controller.showSmallM.Count != controller.manufacturing.Count) {
 			if (controller.showSmallM.Count > controller.manufacturing.Count) 
 				controller.showSmallM.RemoveAt (controller.showSmallM.Count - 1);
 			else {
 				controller.showSmallM.Add (false);
 			}
-		}
+		}//while showing each manufacturing not correct length
 		for (int p = 0; p<posts.Length; p++) {
-			TradePost post = posts[p].GetComponent<TradePost>();
+			TradePost post = postScripts [p] = posts [p].GetComponent<TradePost> ();
 			while (post.stock.Count != controller.goods.Count) {
 				if (post.stock.Count > controller.goods.Count) {
 					post.stock.RemoveAt (post.stock.Count - 1);
 				} else {
 					post.stock.Add (new Stock{name = "Name", allow = true});
 				}
-			}
-		}
+			}//end while not enough items in posts
+			CheckManufacturingLists(p);
+			while (post.groups.Count < 2) 
+				post.groups.Add (new Group{allow = false, selection = 0});
+			post.groups [0].allow = true;
+		}//end for posts
+		for (int s = 0; s<spawners.Length; s++) {
+			Spawner spawner = spawners [s].GetComponent<Spawner> ();
+			while (spawner.allowSpawn.Count != controller.goods.Count) {
+				if (spawner.allowSpawn.Count > controller.goods.Count) {
+					spawner.allowSpawn.RemoveAt (spawner.allowSpawn.Count - 1);
+				} else {
+					spawner.allowSpawn.Add (true);
+				}
+			}//end while not enough items in spawner
+		}//end for spawners
+		directories = AssetDatabase.GetAllAssetPaths ();//get all assets so item crate finder works
 	}
 	
 	public override void OnInspectorGUI ()
 	{
-		#region settings
-		controller.settings = EditorGUILayout.Foldout (controller.settings, "Settings");		
-		EditorGUI.indentLevel = 1;
+		EditorGUILayout.BeginHorizontal ();
+		GUILayout.FlexibleSpace ();
+		controller.selC = GUILayout.Toolbar (controller.selC, new string[]{"Settings", "Goods", "Manufacturing", "Overview"});
+		GUILayout.FlexibleSpace ();
+		EditorGUILayout.EndHorizontal ();
 		
-		if (controller.settings) {		
-		#region expendable traders
+		#region settings				
+		if (controller.selC == 0) {		
+			EditorGUI.indentLevel = 0;
+			
+			EditorGUILayout.BeginHorizontal ();
+			controller.updateInterval = Mathf.Max (EditorGUILayout.FloatField (new GUIContent ("Update interval", "This is the time between updates of the prices at trade posts and possible trades"), controller.updateInterval), 0.01f);
+			EditorGUILayout.LabelField ("");
+			EditorGUILayout.EndHorizontal ();
+			
+			controller.allowPickup = EditorGUILayout.Toggle (new GUIContent ("Allow item pickup", "Allow the pickup of items from spawners or dropped items. Cannot be disabled if there are spawners, trader pickup is enabled individually"), controller.allowPickup);
+			
+			#region show trade routes
+			EditorGUI.indentLevel = 0;
+			bool before = controller.showR;
+			controller.showR = EditorGUILayout.Toggle ("Show trade routes", controller.showR);
+			if (controller.showR != before)
+				controller.transform.Translate (Vector3.zero);
+			#endregion
+			
+			#region expendable traders
+			if (controller.expendable)
+				EditorGUILayout.BeginVertical ("HelpBox");
 			controller.expendable = EditorGUILayout.Toggle ("Expendable traders", controller.expendable);
 			
 			if (controller.expendable) {
-				EditorGUI.indentLevel = 2;
+				EditorGUI.indentLevel = 0;
 				EditorGUILayout.BeginHorizontal ();
 				controller.pauseBeforeStart = EditorGUILayout.Toggle ("Pause before leave", controller.pauseBeforeStart);				
 				controller.maxNoTraders = EditorGUILayout.IntField ("Max no. traders", controller.maxNoTraders);
-				controller.maxNoTraders = (int)Mathf.Clamp (controller.maxNoTraders, 1, Mathf.Infinity);
+				controller.maxNoTraders = (int)Mathf.Clamp (controller.maxNoTraders, 0, Mathf.Infinity);
 				EditorGUILayout.EndHorizontal ();
 				
 				EditorGUILayout.BeginHorizontal ();
@@ -66,49 +109,114 @@ public class ControllerEditor : Editor
 					controller.showE = true;
 				}
 				EditorGUILayout.EndHorizontal ();
-
+				
 				controller.showE = EditorGUILayout.Foldout (controller.showE, "Expendable trader types");
 				if (controller.showE) {
-					EditorGUI.indentLevel = 3;
-					for (int e = 0; e<controller.expendableT.Count; e++) {
-						String name;
-						if (controller.expendableT [e] == null)
-							name = "Trader" + e;
-						else
-							name = controller.expendableT [e].name;
-						EditorGUILayout.BeginHorizontal ();
-						controller.expendableT [e] = (GameObject)EditorGUILayout.ObjectField (name, controller.expendableT [e], typeof(GameObject), true);
-						if (GUILayout.Button ("X", EditorStyles.miniButton, GUILayout.MaxWidth (20f))) {
-							Undo.RegisterUndo ((Controller)target, "Remove trader type");
-							controller.expendableT.RemoveAt (e);
+					if (controller.expendableT.Count > 0) {
+						EditorGUILayout.BeginVertical ("HelpBox");
+						EditorGUI.indentLevel = 0;
+						for (int e = 0; e<controller.expendableT.Count; e++) {
+							String name;
+							if (controller.expendableT [e] == null)
+								name = "Trader " + e;
+							else
+								name = controller.expendableT [e].name;
+							EditorGUILayout.BeginHorizontal ();
+							controller.expendableT [e] = (GameObject)EditorGUILayout.ObjectField (name, controller.expendableT [e], typeof(GameObject), false);
+							EditorGUILayout.BeginVertical (GUILayout.MaxWidth (18f));
+							GUILayout.Space (3f);
+							if (GUILayout.Button ("", "OL Minus")) {
+								Undo.RegisterUndo ((Controller)target, "Remove trader type");
+								controller.expendableT.RemoveAt (e);
+							}
+							EditorGUILayout.EndVertical ();
+							EditorGUILayout.EndHorizontal ();
 						}
-						EditorGUILayout.EndHorizontal ();
+						GUILayout.EndVertical ();
 					}
 				}
 			}
+			if (controller.expendable)
+				GUILayout.EndVertical ();
 			GUI.enabled = true;
 			#endregion
+			#region groups
+			EditorGUI.indentLevel = 0;
+			if (controller.allowGroups)
+				EditorGUILayout.BeginVertical ("HelpBox");
+			EditorGUI.indentLevel = 0;
+			bool allowGroupsChnage = controller.allowGroups;
+			controller.allowGroups = EditorGUILayout.Toggle (new GUIContent ("Enable Groups", "Groups can be used to allow trading between select trade posts"), controller.allowGroups);
+			if (controller.allowGroups != allowGroupsChnage && controller.showR)
+				controller.transform.Translate (Vector3.zero);	
+			if (controller.allowGroups) {
+				EditorGUILayout.BeginHorizontal ();
+				EditorGUILayout.LabelField ("Number of groups:", "" + controller.groups.Count);
+				if (GUILayout.Button ("Add", EditorStyles.miniButton)) {
+					Undo.RegisterUndo ((Controller)target, "Add new group");
+					controller.groups.Add ("Group " + controller.groups.Count);
+					controller.showG = true;
+				}
+				EditorGUILayout.EndHorizontal ();
+				controller.showG = EditorGUILayout.Foldout (controller.showG, "Groups");
+				if (controller.showG) {
+					if (controller.groups.Count > 0) {
+						EditorGUILayout.BeginVertical ("HelpBox");
+						for (int g = 0; g<controller.groups.Count; g++) {
+							EditorGUILayout.BeginHorizontal ();
+							if (controller.groups [g] == "")
+								controller.groups [g] = "Element " + controller.groups.Count;
+							controller.groups [g] = EditorGUILayout.TextField (controller.groups [g], controller.groups [g]);
+							EditorGUILayout.BeginVertical (GUILayout.MaxWidth (18f));
+							GUILayout.Space (3f);
+							if (GUILayout.Button ("", "OL Minus")) {
+								Undo.RegisterUndo ((Controller)target, "Delete group");
+								for (int p = 0; p<postScripts.Length; p++) {
+									for (int e = 0; e<postScripts[p].groups.Count; e++) {
+										if (postScripts [p].groups [e].selection == g)
+											postScripts [p].groups [e].selection = -1;
+										if (postScripts [p].groups [e].selection > g) 
+											postScripts [p].groups [e].selection -= 1;
+									}
+								}
+								controller.groups.RemoveAt (g);
+							}
+							EditorGUILayout.EndVertical ();
+							EditorGUILayout.EndHorizontal ();
+						}
+						EditorGUILayout.EndVertical ();
+					}
+				}	
+			}
+			if (controller.allowGroups)
+				GUILayout.EndVertical ();
+			#endregion
 			#region units
-			EditorGUI.indentLevel = 1;
-			controller.showAllU = EditorGUILayout.Foldout (controller.showAllU, "Units");
-			if (controller.showAllU) {
+			EditorGUI.indentLevel = 0;
+			controller.showAU = EditorGUILayout.Foldout (controller.showAU, "Units");
+			if (controller.showAU) {
+				if (controller.units.Count > 0)
+					GUILayout.BeginVertical ("HelpBox");
 				if (GUILayout.Button ("Add", EditorStyles.miniButton)) {
 					Undo.RegisterUndo ((Controller)target, "Add new unit");
 					controller.units.Add (new Unit{suffix = "New unit", max = Mathf.Infinity, min = 0.000001f});
 				}
 				for (int u = 0; u<controller.units.Count; u++) {
 					Unit cur = controller.units [u];
-					EditorGUI.indentLevel = 2;
+					EditorGUI.indentLevel = 0;
 					
 					EditorGUILayout.BeginHorizontal ();
 					cur.suffix = EditorGUILayout.TextField ("Unit suffix", cur.suffix);
-					if (GUILayout.Button ("X", EditorStyles.miniButton, GUILayout.MaxWidth (20f))) {
+					EditorGUILayout.BeginVertical (GUILayout.MaxWidth (18f));
+					GUILayout.Space (3f);
+					if (GUILayout.Button ("", "OL Minus")) {
 						Undo.RegisterUndo ((Controller)target, "Remove unit");
 						controller.units.RemoveAt (u);
 					}
+					EditorGUILayout.EndVertical ();
 					EditorGUILayout.EndHorizontal ();
 					
-					EditorGUI.indentLevel = 3;
+					EditorGUI.indentLevel = 1;
 					EditorGUILayout.BeginHorizontal ();
 					cur.min = EditorGUILayout.FloatField ("Min", cur.min);
 					cur.max = EditorGUILayout.FloatField ("Max", cur.max);
@@ -122,23 +230,23 @@ public class ControllerEditor : Editor
 					for (int g = 0; g< controller.goods.Count; g++)
 						SetUnit (g);
 				}
-				EditorGUI.indentLevel = 2;
+				EditorGUI.indentLevel = 0;
 				if (CheckOverlap ()) 
 					EditorGUILayout.HelpBox ("There is overlap between some of the units.\nMake sure that there are " +
 							"no unis with an overlap.", MessageType.Warning);
 				if (!CheckInfinity () && controller.units.Count > 0)
 					EditorGUILayout.HelpBox ("None of your units extend to ininity. As a result, some items may not have " +
 						"any units. To extend to infinity, type infinity into the max field.", MessageType.Warning);
+				if (controller.units.Count > 0)
+					GUILayout.EndVertical ();
 			}
+		#endregion
 		}
 		#endregion
-		#endregion
 		#region goods
-		EditorGUI.indentLevel = 0;
-		controller.showAllG = EditorGUILayout.Foldout (controller.showAllG, "Goods");
-		if (controller.showAllG) {			
+		if (controller.selC == 1) {			
 			EditorGUILayout.BeginHorizontal ();
-			EditorGUI.indentLevel = 1;
+			EditorGUI.indentLevel = 0;
 			EditorGUILayout.LabelField ("Number of types", controller.goods.Count.ToString ());
 			
 			GUIEnable (controller.goods.Count);
@@ -152,20 +260,21 @@ public class ControllerEditor : Editor
 			EditorGUILayout.EndHorizontal ();
 			
 			for (int g = 0; g < controller.goods.Count; g++) {
-				EditorGUI.indentLevel = 1;
+				EditorGUI.indentLevel = 0;
 				string name = controller.goods [g].name;
 				if (name == "")
 					name = "Name";
 				controller.showSmallG [g] = EditorGUILayout.Foldout (controller.showSmallG [g], name);
 	
 				if (controller.showSmallG [g]) {
-					EditorGUI.indentLevel = 3;
-					
+					EditorGUILayout.BeginVertical ("HelpBox");
+					EditorGUI.indentLevel = 0;
+					#region goods buttons
 					EditorGUILayout.BeginHorizontal ();
 					if (GUILayout.Button ("Add before", EditorStyles.miniButtonLeft)) {
 						Undo.RegisterUndo ((Controller)target, "Add new type before " + controller.allNames [g]);
 						controller.goods.Insert (g, new Goods{name = "Name", basePrice = 0, minPrice = 0, maxPrice = 0, mass = 1});
-						controller.showSmallG.Insert (g, false);
+						controller.showSmallG.Insert (g, true);
 						controller.allNames.Insert (g, "Name");	
 						ChangeFromPoint (g - 1, true);
 						AddStock (g);
@@ -178,20 +287,23 @@ public class ControllerEditor : Editor
 						ChangeFromPoint (g - 1, false);
 						CheckManufacturing ();
 						for (int p = 0; p< posts.Length; p++) {
-							posts [p].GetComponent<TradePost> ().stock.RemoveAt (g);
+							postScripts [p].stock.RemoveAt (g);
+						}
+						for (int s = 0; s< spawners.Length; s++) {
+							spawners [s].GetComponent<Spawner> ().allowSpawn.RemoveAt (g);
 						}
 						break;
 					}
 					if (GUILayout.Button ("Add after", EditorStyles.miniButtonRight)) {
 						Undo.RegisterUndo ((Controller)target, "Add new type after " + controller.allNames [g]);
 						controller.goods.Insert (g + 1, new Goods{name = "Name", basePrice = 0, minPrice = 0, maxPrice = 0, mass = 1});
-						controller.showSmallG.Insert (g + 1, false);
+						controller.showSmallG.Insert (g + 1, true);
 						controller.allNames.Insert (g + 1, "Name");
 						ChangeFromPoint (g, true);
 						AddStock (g + 1);
 					}
 					EditorGUILayout.EndHorizontal ();
-					
+					#endregion
 					EditorGUILayout.BeginHorizontal ();
 					name = EditorGUILayout.TextField ("Name", name);
 					string unit = "";
@@ -201,13 +313,31 @@ public class ControllerEditor : Editor
 					controller.goods [g].name = name;
 					EditorGUILayout.EndHorizontal ();
 					
-					EditorGUI.indentLevel = 2;
+					if (controller.allowPickup) {
+						EditorGUILayout.BeginHorizontal ();
+						controller.goods [g].itemCrate = (GameObject)EditorGUILayout.ObjectField (new GUIContent ("Item crate", "This is what the item looks like when you see it in the game, so is likely to be in a box or crate"), controller.goods [g].itemCrate, typeof(GameObject), false);
+						if (GUILayout.Button (new GUIContent ("Find crate", "Find an item crate. The name of the GameObject needs to be exactly the same as the name of the item."), EditorStyles.miniButton)) {
+							Undo.RegisterUndo ((Controller)target, "Find item crate");
+							for (int d = 0; d<directories.Length; d++) {
+								GameObject asset = (GameObject)AssetDatabase.LoadAssetAtPath (directories [d], typeof(GameObject));
+								if (asset != null && asset.name == controller.goods [g].name) {
+									controller.goods [g].itemCrate = asset;
+									break;
+								} 
+							}
+							if (controller.goods [g].itemCrate == null)
+								Debug.LogWarning ("Could not find an item crate.\nPlease make sure that the item crate has the same name as the item.");
+						}
+						
+						EditorGUILayout.EndHorizontal ();
+					}
+
 					EditorGUILayout.LabelField ("Prices", EditorStyles.boldLabel);
 					
-					EditorGUI.indentLevel = 3;
+					EditorGUI.indentLevel = 1;
 					EditorGUILayout.BeginHorizontal ();
 					controller.goods [g].basePrice = EditorGUILayout.IntField ("Base", controller.goods [g].basePrice);
-					EditorGUILayout.LabelField ("", "");
+					EditorGUILayout.LabelField ("");
 					EditorGUILayout.EndHorizontal ();
 					
 					EditorGUILayout.BeginHorizontal ();
@@ -221,25 +351,25 @@ public class ControllerEditor : Editor
 					controller.goods [g].maxPrice = (int)Mathf.Clamp (controller.goods [g].maxPrice, controller.goods [g].basePrice, Mathf.Infinity);
 					
 					SetUnit (g);
+					GUILayout.EndVertical ();
 				}
 				
 			}//end for all
 			if (controller.goods.Count == 0) {
 				if (GUILayout.Button ("Add")) {
+					Undo.RegisterUndo ((Controller)target, "Add new good");
 					controller.showSmallG.Add (true);
 					controller.goods.Add (new Goods{name = "Name", basePrice = 0, minPrice = 0, maxPrice = 0, mass = 1});
 					controller.allNames.Add ("Name");
-					AddStock(0);
+					AddStock (0);
 				}
 			}
 				
 		}//end if showing goods
 		#endregion
 		#region manufacturing
-		EditorGUI.indentLevel = 0;
-		controller.showAllM = EditorGUILayout.Foldout (controller.showAllM, "Manufacturing");
-		if (controller.showAllM) {
-			EditorGUI.indentLevel = 1;
+		if (controller.selC == 2) {
+			EditorGUI.indentLevel = 0;
 			
 			EditorGUILayout.BeginHorizontal ();
 			EditorGUILayout.LabelField ("Number of types", controller.manufacturing.Count.ToString ());
@@ -257,9 +387,7 @@ public class ControllerEditor : Editor
 			EditorGUILayout.BeginHorizontal ();
 			if (GUILayout.Button ("Add", EditorStyles.miniButtonLeft)) {
 				Undo.RegisterUndo ((Controller)target, "Add new manufacturing process");
-				controller.showSmallM.Add (false);
-				if (controller.manufacturing.Count == 0)
-					controller.showSmallM [0] = true;
+				controller.showSmallM.Add (true);
 				if (controller.goods.Count == 0) 
 					Debug.LogError ("There are no possible types to manufacture\nAdd some types to goods");
 				controller.manufacturing.Add (new Items{name = "", needing = new List<NeedMake> (), making = new List<NeedMake> ()});
@@ -268,13 +396,14 @@ public class ControllerEditor : Editor
 			GUIEnable (controller.manufacturing.Count);
 			if (GUILayout.Button ("Check", EditorStyles.miniButtonRight)) {				
 				float[] inf = new float[controller.goods.Count];
+				float total = 0;
 				for (int p = 0; p<posts.Length; p++) {
 					for (int m = 0; m<controller.manufacturing.Count; m++) {
-						TradePost post = posts [p].GetComponent<TradePost> ();
-						if (post.manufacture [m].yesNo) {
+						TradePost post = postScripts [p];
+						if (post.manufacture [m].allow) {
 							for (int i = 0; i<controller.manufacturing[m].needing.Count; i++) 
 								inf [controller.manufacturing [m].needing [i].item] -= (controller.manufacturing [m].needing [i].number / (post.manufacture [m].seconds * 1f));
-							for (int i = 0; i<controller.manufacturing[m].making.Count; i++) 
+							for (int i = 0; i<controller.manufacturing[m].making.Count; i++)
 								inf [controller.manufacturing [m].making [i].item] += (controller.manufacturing [m].making [i].number / (post.manufacture [m].seconds * 1f));
 						}
 					}
@@ -286,25 +415,36 @@ public class ControllerEditor : Editor
 				for (int g = 0; g<controller.goods.Count; g++) {
 					show += "\n" + controller.goods [g].name + " ";
 					if (inf [g] > 0)
-						show += "increase ("+inf[g].ToString("f2")+")";
+						show += "increase (" + inf [g].ToString ("f2") + ")";
 					else if (inf [g] == 0)
 						show += "same";
 					else
-						show += "decrease ("+Mathf.Abs(inf[g]).ToString("f2")+")";
+						show += "decrease (" + Mathf.Abs (inf [g]).ToString ("f2") + ")";
+					total += inf [g];
 				}
+				show += "\nGlobal change: ";
+				
+				if (total > 0)
+					show += "increase (" + total.ToString ("f2") + ")";
+				else if (total == 0)
+					show += "same";
+				else
+					show += "decrease (" + Mathf.Abs (total).ToString ("f2") + ")";
+				
 				EditorUtility.DisplayDialog ("Checking manufacturing", show, "Ok");	
 			}
 			EditorGUILayout.EndHorizontal ();
 			GUI.enabled = true;
 			
 			for (int m = 0; m < controller.manufacturing.Count; m++) {
-				EditorGUI.indentLevel = 1;
+				EditorGUI.indentLevel = 0;
 				string name = controller.manufacturing [m].name;
 				if (name == "")
 					name = "Element " + m;
 				controller.showSmallM [m] = EditorGUILayout.Foldout (controller.showSmallM [m], name);
 				if (controller.showSmallM [m]) {
-					EditorGUI.indentLevel = 3;
+					EditorGUILayout.BeginVertical ("HelpBox");
+					EditorGUI.indentLevel = 0;
 					
 					EditorGUILayout.BeginHorizontal ();
 					name = EditorGUILayout.TextField ("Name", name);
@@ -319,7 +459,6 @@ public class ControllerEditor : Editor
 					
 					controller.manufacturing [m].name = name;
 					
-					EditorGUI.indentLevel = 2;
 					EditorGUILayout.BeginHorizontal ();
 					EditorGUILayout.LabelField ("Needing", EditorStyles.boldLabel);
 					if (GUILayout.Button ("Add")) {
@@ -330,20 +469,23 @@ public class ControllerEditor : Editor
 					EditorGUILayout.EndHorizontal ();
 					
 					for (int n = 0; n<controller.manufacturing[m].needing.Count; n++) {
-						EditorGUI.indentLevel = 3;
+						EditorGUI.indentLevel = 1;
 						EditorGUILayout.BeginHorizontal ();
-						controller.manufacturing [m].needing [n].item = EditorGUILayout.Popup ("Type", controller.manufacturing [m].needing [n].item, controller.allNames.ToArray ());
+						controller.manufacturing [m].needing [n].item = EditorGUILayout.Popup ("Type", controller.manufacturing [m].needing [n].item, controller.allNames.ToArray (), "DropDownButton");
 						controller.manufacturing [m].needing [n].number = EditorGUILayout.IntField ("Quantity", controller.manufacturing [m].needing [n].number);
-						if (GUILayout.Button ("X", EditorStyles.miniButton, GUILayout.MaxWidth (20f))) {
+						EditorGUILayout.BeginVertical (GUILayout.MaxWidth (18f));
+						GUILayout.Space (3f);
+						if (GUILayout.Button ("", "OL Minus")) {
 							Undo.RegisterUndo ((Controller)target, "Remove needing item from " + controller.manufacturing [m].name);
 							controller.manufacturing [m].needing.RemoveAt (n);
 							break;
 						}
+						EditorGUILayout.EndVertical ();
 						EditorGUILayout.EndHorizontal ();
 						controller.manufacturing [m].needing [n].number = (int)Mathf.Clamp (controller.manufacturing [m].needing [n].number, 0, Mathf.Infinity);
 					}
 					
-					EditorGUI.indentLevel = 2;
+					EditorGUI.indentLevel = 0;
 					EditorGUILayout.BeginHorizontal ();
 					EditorGUILayout.LabelField ("Making", EditorStyles.boldLabel);
 					if (GUILayout.Button ("Add")) {
@@ -354,43 +496,201 @@ public class ControllerEditor : Editor
 					EditorGUILayout.EndHorizontal ();
 					
 					for (int n = 0; n<controller.manufacturing[m].making.Count; n++) {
-						EditorGUI.indentLevel = 3;
+						EditorGUI.indentLevel = 1;
 						EditorGUILayout.BeginHorizontal ();
-						controller.manufacturing [m].making [n].item = EditorGUILayout.Popup ("Type", controller.manufacturing [m].making [n].item, controller.allNames.ToArray ());
+						controller.manufacturing [m].making [n].item = EditorGUILayout.Popup ("Type", controller.manufacturing [m].making [n].item, controller.allNames.ToArray (), "DropDownButton");
 						controller.manufacturing [m].making [n].number = EditorGUILayout.IntField ("Quantity", controller.manufacturing [m].making [n].number);
-						if (GUILayout.Button ("X", EditorStyles.miniButton, GUILayout.MaxWidth (20f))) {
+						EditorGUILayout.BeginVertical (GUILayout.MaxWidth (18f));
+						GUILayout.Space (3f);
+						if (GUILayout.Button ("", "OL Minus")) {
 							Undo.RegisterUndo ((Controller)target, "Remove making item from " + controller.manufacturing [m].name);
 							controller.manufacturing [m].making.RemoveAt (n);
 							break;
 						}
+						EditorGUILayout.EndVertical ();
 						EditorGUILayout.EndHorizontal ();
 						controller.manufacturing [m].making [n].number = (int)Mathf.Clamp (controller.manufacturing [m].making [n].number, 0, Mathf.Infinity);
 					}
-					
+					GUILayout.EndVertical ();
 				}
 			}//end for all manufacturing
 		}//end if showing manufacturing
 		#endregion
+		#region Overview
+		if (controller.selC == 3) {
+			EditorGUI.indentLevel = 0;
+			
+			EditorGUILayout.BeginHorizontal ();
+			controller.showHoriz = EditorGUILayout.Toggle (new GUIContent ("Show items vertically", "This will show the items ascending vertically"), controller.showHoriz, "Radio");
+			controller.showHoriz = !EditorGUILayout.Toggle (new GUIContent ("Show items horizontally", "This will show the items ascending h"), !controller.showHoriz, "Radio");
+			EditorGUILayout.EndHorizontal ();
+			#region groups
+			{
+				if (!controller.allowGroups) {
+					EditorGUI.indentLevel = 0;
+					EditorGUILayout.BeginVertical ("HelpBox");
+					EditorGUILayout.LabelField ("Groups", EditorStyles.boldLabel);
+					EditorGUI.indentLevel = 1;
+					EditorGUILayout.HelpBox ("Grouping has not been enabled, so all posts can trade with each other", MessageType.Info);
+					EditorGUILayout.EndVertical ();
+				} else {
+					int[] count = new int[controller.groups.Count];
+					for (int p = 0; p<postScripts.Length; p++) {
+						for (int g = 0; g<postScripts[p].groups.Count; g++) {
+							if (postScripts [p].groups [g].allow && postScripts [p].groups [g].selection != -1)
+								count [postScripts [p].groups [g].selection]++;
+						}
+					}
+					EditorGUI.indentLevel = 0;
+					EditorGUILayout.BeginVertical ("HelpBox");
+					EditorGUILayout.LabelField ("Groups", EditorStyles.boldLabel);
+					EditorGUI.indentLevel = 1;
+					if (!controller.showHoriz) {
+						for (int g = 0; g<controller.groups.Count; g=g+2) {
+							EditorGUILayout.BeginHorizontal ();
+							EditorGUILayout.LabelField (new GUIContent (controller.groups [g]), new GUIContent ("" + count [g], "This is the number of posts that are in this group"));
+							if (g < controller.groups.Count - 1)
+								EditorGUILayout.LabelField (new GUIContent (controller.groups [g + 1]), new GUIContent ("" + count [g + 1], "This is the number of posts that are in this group"));
+							EditorGUILayout.EndHorizontal ();
+						}
+					} else {
+						int half = Mathf.CeilToInt (controller.groups.Count / 2f);
+						for (int g = 0; g<half; g++) {
+							EditorGUILayout.BeginHorizontal ();
+							EditorGUILayout.LabelField (new GUIContent (controller.groups [g]), new GUIContent ("" + count [g], "This is the number of posts that are in this group"));
+							if (half + g < controller.groups.Count)
+								EditorGUILayout.LabelField (new GUIContent (controller.groups [half + g]), new GUIContent ("" + count [half + g], "This is the number of posts that are in this group"));
+							EditorGUILayout.EndHorizontal ();
+						}
+					}
+					int totalLinks = 0;
+					for (int p1 = 0; p1<postScripts.Length; p1++) {
+						for (int p2 = p1 +1; p2<postScripts.Length; p2++) {
+							if (controller.CheckGroups (postScripts [p1], postScripts [p2])) {
+								totalLinks++;
+							}
+						}
+					}
+					EditorGUI.indentLevel = 0;
+					EditorGUILayout.LabelField (new GUIContent ("Total number of links", "This is the total number of  unique trade links (Does not include links going in the opposite direction to that already counted)"), 
+						new GUIContent ("" + totalLinks, "This is the total number of  unique trade links (Does not include links going in the opposite direction to that already counted)"));
+					EditorGUILayout.EndVertical ();
+				}//groups have been enabled
+			}
+			#endregion
+			#region item totals
+			{
+				EditorGUI.indentLevel = 0;
+				EditorGUILayout.BeginVertical ("HelpBox");
+				EditorGUILayout.LabelField ("Item totals", EditorStyles.boldLabel);
+				EditorGUI.indentLevel = 1;
+				string text1 = "The number in brackets next to the item name is the number of posts it is available at.";
+				string text2 = "This is the number of the item available in the game";
+				int[] total = new int[controller.goods.Count];
+				int[] count = new int[controller.goods.Count];
+				for (int g = 0; g<controller.goods.Count; g++) {
+					if (!Application.isPlaying) {
+						for (int p = 0; p<posts.Length; p++) { 
+							if (postScripts [p].stock [g].allow) {
+								total [g] += postScripts [p].stock [g].number;
+								count [g]++;
+							}
+						}
+					} else {
+						total [g] = Mathf.RoundToInt (controller.goods [g].average * controller.goods [g].postCount);
+						count [g] = controller.goods [g].postCount;
+					}
+				}//end for get totals
+				if (!controller.showHoriz) {
+					for (int g = 0; g<controller.goods.Count; g=g+2) {
+						EditorGUILayout.BeginHorizontal ();
+						EditorGUILayout.LabelField (new GUIContent (controller.goods [g].name + " (" + count [g] + ")", text1), new GUIContent ("" + total [g], text2));
+						if (g < controller.goods.Count - 1)
+							EditorGUILayout.LabelField (new GUIContent (controller.goods [g + 1].name + " (" + count [g + 1] + ")", text1), new GUIContent ("" + total [g + 1], text2));
+						EditorGUILayout.EndHorizontal ();
+					}
+				} else {
+					int half = Mathf.CeilToInt (controller.goods.Count / 2f);
+					for (int g = 0; g<half; g++) {
+						EditorGUILayout.BeginHorizontal ();
+						EditorGUILayout.LabelField (new GUIContent (controller.goods [g].name + " (" + count [g] + ")", text1), new GUIContent ("" + total [g], text2));
+						if (half + g < controller.goods.Count)
+							EditorGUILayout.LabelField (new GUIContent (controller.goods [half + g].name + " (" + count [half + g] + ")", text1), new GUIContent ("" + total [half + g], text2));
+						EditorGUILayout.EndHorizontal ();
+					}
+				}
+				long totalAll = 0;
+				for (int t = 0; t<total.Length; t++)
+					totalAll += total [t];
+				EditorGUI.indentLevel = 0;
+				EditorGUILayout.LabelField (new GUIContent ("Total number of items: ", "This is the total number of items available in game."), new GUIContent ("" + totalAll, "This is the total number of items available in game."));
+				GUILayout.EndVertical ();
+			}			
+			#endregion
+			
+			#region manufacturing totals
+			{
+				EditorGUI.indentLevel = 0;
+				EditorGUILayout.BeginVertical ("HelpBox");
+				EditorGUILayout.LabelField ("Manufacturing totals", EditorStyles.boldLabel);
+				EditorGUI.indentLevel = 1;
+				int[] count = new int[controller.manufacturing.Count];
+				string text = "This is the number of posts where the manufacturing process has been enabled";
+				for (int m = 0; m<controller.manufacturing.Count; m++) {
+					for (int p = 0; p<posts.Length; p++)
+						if (postScripts [p].manufacture [m].allow)
+							count [m]++;
+				}//end for get totals
+				if (!controller.showHoriz) {
+					for (int m = 0; m<controller.manufacturing.Count; m=m+2) {
+						EditorGUILayout.BeginHorizontal ();
+						EditorGUILayout.LabelField (new GUIContent (controller.manufacturing [m].name), new GUIContent ("" + count [m], text));
+						if (m < controller.manufacturing.Count - 1)
+							EditorGUILayout.LabelField (new GUIContent (controller.manufacturing [m + 1].name), new GUIContent ("" + count [m + 1], text));
+						EditorGUILayout.EndHorizontal ();
+					}
+				} else {
+					int half = Mathf.CeilToInt (controller.manufacturing.Count / 2f);
+					for (int m = 0; m<half; m++) {
+						EditorGUILayout.BeginHorizontal ();
+						EditorGUILayout.LabelField (new GUIContent (controller.manufacturing [m].name), new GUIContent ("" + count [m], text));
+						if (half + m < controller.manufacturing.Count)
+							EditorGUILayout.LabelField (new GUIContent (controller.manufacturing [half + m].name), new GUIContent ("" + count [half + m], text));
+						EditorGUILayout.EndHorizontal ();
+					}
+				}
+			}
+			GUILayout.EndVertical ();
+			#endregion
+		}//end if showing overview
+		#endregion
 		#region GUI changed
 		if (GUI.changed) {//get changes so can update other scripts
 			for (int p = 0; p<posts.Length; p++) {
-				TradePost post = posts [p].GetComponent<TradePost> ();
+				TradePost post = postScripts [p];
 				
-				while (post.manufacture.Count != controller.manufacturing.Count) {
-					if (post.manufacture.Count > controller.manufacturing.Count)
-						post.manufacture.RemoveAt (post.manufacture.Count - 1);
-					else
-						post.manufacture.Add (new Mnfctr{yesNo = false, seconds = 1});
-				}
-				
-//				Debug.Log("post: "+posts[p].name+"\nstock length: "+post.stock.Count+"\ncontroller goods length: "+controller.goods.Count);
-				for (int x = 0; x<controller.goods.Count; x++) {
+				for (int x = 0; x<controller.goods.Count; x++) 
 					post.stock [x].name = controller.goods [x].name;
-					controller.allNames [x] = controller.goods [x].name;
-				}
+				CheckManufacturingLists (p);
 			}//end for posts
+			
+			for (int x = 0; x<controller.goods.Count; x++)
+				controller.allNames [x] = controller.goods [x].name;
+			
+			if (!controller.allowPickup && GameObject.FindGameObjectsWithTag ("Spawner").Length > 0)
+				controller.allowPickup = true;
 		}//end if GUI changed
 		#endregion	
+	}
+	
+	void CheckManufacturingLists(int p){
+		TradePost post = postScripts[p];
+		while (post.manufacture.Count != controller.manufacturing.Count) {
+			if (post.manufacture.Count > controller.manufacturing.Count)
+				post.manufacture.RemoveAt (post.manufacture.Count - 1);
+			else
+				post.manufacture.Add (new Mnfctr{allow = false, seconds = 1});
+		}//end while not enough manufacturing
 	}
 
 	void ChangeFromPoint (int point, bool increase)
@@ -411,7 +711,10 @@ public class ControllerEditor : Editor
 	void AddStock (int point)
 	{
 		for (int p = 0; p< posts.Length; p++) {
-			posts [p].GetComponent<TradePost> ().stock.Insert (point, new Stock{name = "Name", allow = true});
+			postScripts [p].stock.Insert (point, new Stock{name = "Name", allow = true});
+		}
+		for (int s = 0; s< spawners.Length; s++) {
+			spawners [s].GetComponent<Spawner> ().allowSpawn.Insert (point, true);
 		}
 	}
 	
@@ -482,10 +785,25 @@ public class ControllerEditor : Editor
 		}
 	}
 	
-	void GUIEnable(int count){
+	void GUIEnable (int count)
+	{
 		if (count > 0)
 			GUI.enabled = true;
 		else
 			GUI.enabled = false;
+	}
+	
+	void OnSceneGUI ()
+	{
+		if (controller.showR) {
+			for (int p1 = 0; p1<postScripts.Length; p1++) {
+				for (int p2 = p1 +1; p2<postScripts.Length; p2++) {
+					if (controller.CheckGroups (postScripts [p1], postScripts [p2])) {
+						Handles.color = Color.green;
+						Handles.DrawLine (posts [p1].transform.position, posts [p2].transform.position);
+					}
+				}
+			}
+		}
 	}
 }
