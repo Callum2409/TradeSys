@@ -12,7 +12,7 @@ demonstrate the use and show you the methods and variables that store the requir
 I hope this is useful in creating your GUI!
 */
 
-		TradeSys.Controller controller; //This is the TradeSys controller to make it easier to get the variables from later
+		CallumP.TradeSys.Controller controller; //This is the TradeSys controller to make it easier to get the variables from later
 	
 		public float transMult = 0.1f, rotMult = 1f;//multipliers used to change translation and rotation speeds
 	
@@ -24,8 +24,8 @@ I hope this is useful in creating your GUI!
 		double spaceRemaining;//the amount of cargo space remaining
 		bool enter, inside;//if the player is close enough to enter, if is in inside mode or not
 	
-		TradeSys.TradePost nearPost;//this is the trade post that the player is in or is near enough to
-		TradeSys.Item nearItem;//the item that the player is near enough to to pick up the item
+		CallumP.TradeSys.TradePost nearPost;//this is the trade post that the player is in or is near enough to
+		CallumP.TradeSys.Item nearItem;//the item that the player is near enough to to pick up the item
 	
 		string unitLabel = " ";//this is just the unit of the maximum mass to be used with space remaining
 	
@@ -38,7 +38,7 @@ I hope this is useful in creating your GUI!
 	
 		void Start ()
 		{
-				controller = GameObject.FindGameObjectWithTag (TradeSys.Tags.C).GetComponent<TradeSys.Controller> ();//Get the controller. This should be the only gameobject with the controller tag.
+				controller = GameObject.FindGameObjectWithTag (CallumP.TradeSys.Tags.C).GetComponent<CallumP.TradeSys.Controller> ();//Get the controller. This should be the only gameobject with the controller tag.
 				//The TradeSys tags are stored like this to make it easier to find and means that there are no typos which could cause issues!
 		
 				spaceRemaining = cargoSpace;//set the space remaining to the cargo space allowed. This is because it is easier to use the remaining space as a variable
@@ -85,7 +85,7 @@ I hope this is useful in creating your GUI!
 						if (spaceRemaining >= mass) {//if has enough space remaining
 								spaceRemaining -= mass;//remove the space remaining
 								cargo [nearItem.groupID] [nearItem.itemID] += nearItem.number;//add the items to the cargo hold
-				pickup = "You collected " + nearItem.number+"\u00D7"+controller.goods [nearItem.groupID].goods [nearItem.itemID].name;
+								pickup = "You collected " + nearItem.number + "\u00D7" + controller.goods [nearItem.groupID].goods [nearItem.itemID].name;
 								textshow = Time.timeSinceLevelLoad;//set when the text first shown
 								nearItem.Collected ();//need to tell the item that it has been collected
 						}//end if not enough space
@@ -101,11 +101,11 @@ I hope this is useful in creating your GUI!
 				Collider[] nearbyObjects = Physics.OverlapSphere (this.transform.position, closeDistance);
 	
 				for (int n = 0; n<nearbyObjects.Length; n++) {//go through nearby objects and see if they have the trade post tag
-						if (nearbyObjects [n].tag == TradeSys.Tags.TP) {//check has the trade post tag
-								nearPost = nearbyObjects [n].GetComponent<TradeSys.TradePost> ();//set the near post to the trade post script
+						if (nearbyObjects [n].tag == CallumP.TradeSys.Tags.TP) {//check has the trade post tag
+								nearPost = nearbyObjects [n].GetComponent<CallumP.TradeSys.TradePost> ();//set the near post to the trade post script
 								return true;//return true so doesnt go through the rest of the nearby objects
-						} else if (nearbyObjects [n].tag == TradeSys.Tags.I && controller.pickUp) {//if item tag and allowed to collect
-								nearItem = nearbyObjects [n].GetComponent<TradeSys.Item> ();//set the near item to this
+						} else if (nearbyObjects [n].tag == CallumP.TradeSys.Tags.I && controller.pickUp) {//if item tag and allowed to collect
+								nearItem = nearbyObjects [n].GetComponent<CallumP.TradeSys.Item> ();//set the near item to this
 								return false;//needs to return false so is not seen to be at a trade post
 						}//end if item
 				}//end for all nearby objects
@@ -128,18 +128,27 @@ I hope this is useful in creating your GUI!
 						if (GUI.Button (new Rect (Screen.width - 60, 10, 50, 30), "Exit"))//if exit button pressed
 								inside = false;
 			
-						List<bool> enabled = nearPost.tags;
+						if (CallumP.TagManagement.TagManager.ShareEnabled (this.gameObject, nearPost.gameObject, "Factions")) {//can see if they share a faction to allow trading
+								//get the post tags if has been added
+								List<bool> enabled = CallumP.TagManagement.ObjectTags.GetTagsList (nearPost.gameObject, "Post tags");
 						
-						if (enabled [0])
-								EstateAgent ();
-						else if (enabled [1])
-								ShowPurchasable ();
-						else if (enabled [2])
-								ShowOwned ();
-						else
-								ShowShop ();
-				}//end show inside
+								if (enabled.Count < 3)//if doesnt have post tags
+										ShowShop ();
+								else {//else can show the selected window				
+										if (enabled [0])
+												EstateAgent ();
+										else if (enabled [1])
+												ShowPurchasable ();
+										else if (enabled [2])
+												ShowOwned ();
+										else
+												ShowShop ();
+								}//end else show options
 				
+						} else {//else show message that they are not allowing trading
+								ShowEnemyFaction ();
+						}//end else no trading
+				}//end show inside
 				GUI.Label (new Rect (10, Screen.height - 50, 500, 30), pickup);//display that item was collected
 		}//end OnGUI()
 	
@@ -147,9 +156,9 @@ I hope this is useful in creating your GUI!
 		{//show the buy trade post screen
 				GUI.Label (new Rect (10, 50, 250, 80), "Cash: " + cash);//show the player cash
 		
-				List<TradeSys.TradePost> purchasable = new List<TradeSys.TradePost> ();//the list containing all of the trade posts which can be purchased
+				List<CallumP.TradeSys.TradePost> purchasable = new List<CallumP.TradeSys.TradePost> ();//the list containing all of the trade posts which can be purchased
 				for (int p = 0; p<controller.postScripts.Length; p++) {//go through all posts
-						if (controller.postScripts [p].tags [1])//if has the purchasable tag checked
+						if (CallumP.TagManagement.ObjectTags.GetTag (controller.postScripts [p].gameObject, "Post tags", 1))//if has the purchasable tag checked
 								purchasable.Add (controller.postScripts [p]);//add the trade post to the list of purchasable posts
 				}//end for all posts
 				
@@ -165,9 +174,15 @@ I hope this is useful in creating your GUI!
 								nearPost.cash += purchasable [p].cash;//add funds to estate agent as might be doing trading
 								purchasable [p].cash = 0;//set the cash of the purhcased post to 0
 			
-								purchasable [p].tags [1] = false;//set purchasable tag to false
-								purchasable [p].tags [2] = true;//set owned tag to true
-			
+								//can get the ObjectTags component so doesnt need to repeat this step in setting the tag
+								CallumP.TagManagement.ObjectTags postTagObj = CallumP.TagManagement.ObjectTags.GetTagComponent (purchasable [p].gameObject, "Post tags");
+				postTagObj.tags[1].selected = false;
+				postTagObj.tags[2].selected = true;
+								//alternatively, the above SetTags could be changed to be
+				//these are more useful if is a sigle tag or dont have the ObjectTags script already
+				//CallumP.TagManagement.ObjectTags.SetTag (postTagObj, 1, false);
+				//CallumP.TagManagement.ObjectTags.SetTag (postTagObj, 2, true);
+								
 						}//end if purchase clicked
 				}//end for all purchasable
 				
@@ -266,8 +281,8 @@ I hope this is useful in creating your GUI!
 								for (int i = 0; i<controller.goods[g].goods.Count; i++) {//go through all items
 										if (ShowItem (g, i, selected)) {//if the item is to be shown
 						
-												TradeSys.Goods cG = controller.goods [g].goods [i];//get the controller good details
-												TradeSys.Stock pS = nearPost.stock [g].stock [i];//get the trade post stock details
+												CallumP.TradeSys.Goods cG = controller.goods [g].goods [i];//get the controller good details
+												CallumP.TradeSys.Stock pS = nearPost.stock [g].stock [i];//get the trade post stock details
 						
 												GUI.Label (new Rect (50, labelPos * 30, 150, 30), cG.name);//show the name of the item
 												GUI.Label (new Rect (210, labelPos * 30, 150, 30), "Mass: " + cG.unit);//show the mass of the item with the unit
@@ -312,6 +327,11 @@ I hope this is useful in creating your GUI!
 		
 				GUI.EndScrollView ();//end the scroll view
 		}//end ShowShop
+		
+		void ShowEnemyFaction ()
+		{//show message that they are not allowing trades as they are not in the same faction
+				GUI.Label (new Rect (Screen.width / 2 - 200, Screen.height / 2 - 75, 400, 150), "You belong to a faction we refuse to trade with.\n\nPlease exit immediately.");
+		}//end ShowEnemyFaction
 	
 		int HeightCalc (int sel)
 		{//calculate the height necessary to display all of the goods and the group titles
@@ -352,7 +372,7 @@ I hope this is useful in creating your GUI!
 	
 		bool ShowItem (int g, int i, int sel)
 		{//return a bool depending on if the item has buy or sell selected
-				TradeSys.Stock stock = nearPost.stock [g].stock [i];
+				CallumP.TradeSys.Stock stock = nearPost.stock [g].stock [i];
 				if (sel == 0 && stock.sell || sel == 1 && stock.buy)//if buy check and sell at tp enabled, or sell check and buy at tp enabled
 						return true;//return true
 				return false;//else return false

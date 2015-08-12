@@ -5,7 +5,7 @@ using UnityEngine;
 using UnityEditor;
 using System.Collections;
 
-namespace TradeSys
+namespace CallumP.TradeSys
 {//use namespace to stop any name conflicts
 		[CanEditMultipleObjects, CustomEditor(typeof(Spawner))]
 		public class SpawnerEditor : Editor

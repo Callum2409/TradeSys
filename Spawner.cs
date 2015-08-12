@@ -3,9 +3,9 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace TradeSys
+namespace CallumP.TradeSys
 {//use namespace to stop any name conflicts
-		[AddComponentMenu("TradeSys/Make Spawner")]
+		[AddComponentMenu("CallumP/TradeSys/Make Spawner")]
 		//add to component menu	
 		public class Spawner : MonoBehaviour
 		{

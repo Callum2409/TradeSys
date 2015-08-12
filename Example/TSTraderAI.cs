@@ -12,7 +12,7 @@ public class TSTraderAI : MonoBehaviour
 		public float droneTime = 2;//this is how long the trader pauses for when it collects an item. is only required when the trader is allowed to collect items
 		//you may not want a specific pause time, but to have some different code instead. for example, a salvage drone going and collecting the item
 			
-		TradeSys.Trader tS;//this is the trader script on the gameobject that this is attached to
+		CallumP.TradeSys.Trader tS;//this is the trader script on the gameobject that this is attached to
 			
 		GameObject target;//this is the trade post that the trader is heading for
 		
@@ -20,15 +20,15 @@ public class TSTraderAI : MonoBehaviour
 		
 		bool collect;//this is used to know if collection has been enabled in the controller
 
-		TradeSys.Controller controller;//the controller script
+		CallumP.TradeSys.Controller controller;//the controller script
 
 		void Awake ()
 		{
-				tS = gameObject.GetComponent<TradeSys.Trader> ();//need to get the Trader script
+				tS = gameObject.GetComponent<CallumP.TradeSys.Trader> ();//need to get the Trader script
 				
-				collect = GameObject.FindGameObjectWithTag (TradeSys.Tags.C).GetComponent<TradeSys.Controller> ().pickUp;//get the pickUP option in the controller
+				collect = GameObject.FindGameObjectWithTag (CallumP.TradeSys.Tags.C).GetComponent<CallumP.TradeSys.Controller> ().pickUp;//get the pickUP option in the controller
 		
-				controller = GameObject.FindGameObjectWithTag (TradeSys.Tags.C).GetComponent<TradeSys.Controller> ();//get the controller script
+				controller = GameObject.FindGameObjectWithTag (CallumP.TradeSys.Tags.C).GetComponent<CallumP.TradeSys.Controller> ();//get the controller script
 		}//end Awake
 	
 		void Update ()
@@ -59,8 +59,8 @@ public class TSTraderAI : MonoBehaviour
 					
 										GameObject item = itemsInRadar [c].gameObject;//the gameobject that is being checked
 					
-										if (item.tag == TradeSys.Tags.I) {//if the tag of the gameobject is item
-												TradeSys.Item iS = item.GetComponent<TradeSys.Item> ();//get the item script
+										if (item.tag == CallumP.TradeSys.Tags.I) {//if the tag of the gameobject is item
+												CallumP.TradeSys.Item iS = item.GetComponent<CallumP.TradeSys.Item> ();//get the item script
 					
 												if (iS.traderCollect && tS.spaceRemaining >= (iS.number * controller.goods [iS.groupID].goods [iS.itemID].mass)) {
 														//check that the trader can collect the item and has enough cargo space for this item
@@ -81,7 +81,7 @@ public class TSTraderAI : MonoBehaviour
 						
 						
 						if (target != null && Vector3.Distance (transform.position, target.transform.position) <= tS.closeDistance) { //is close enough
-								if (target.gameObject.tag == TradeSys.Tags.TP)//if the target is a trade post
+								if (target.gameObject.tag == CallumP.TradeSys.Tags.TP)//if the target is a trade post
 										StartCoroutine (tS.AtPost ());//IMPORTANT - call the AtPost method, so will unload the cargo
 					else//else the target is an item, so needs to be picked up
 										StartCoroutine (CollectItem ());//collect the item
@@ -96,7 +96,7 @@ public class TSTraderAI : MonoBehaviour
 				tS.allowGo = true;//trader can now continue
 		
 				if (target != null) {
-						TradeSys.Item iS = target.GetComponent<TradeSys.Item> ();//get the item script
+						CallumP.TradeSys.Item iS = target.GetComponent<CallumP.TradeSys.Item> ();//get the item script
 						if(iS != null){//check if null as it may have been collected
 						tS.items [iS.groupID].items [iS.itemID].number += iS.number;//increase the number being carreid
 						tS.spaceRemaining -= iS.number * controller.goods [iS.groupID].goods [iS.itemID].mass;//decrease the cargo space remaining

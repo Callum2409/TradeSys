@@ -2,9 +2,9 @@
 using System.Collections;
 using System.Collections.Generic;
 
-namespace TradeSys
+namespace CallumP.TradeSys
 {//use namespace to stop any name conflicts
-		[AddComponentMenu("TradeSys/Make Post")]
+		[AddComponentMenu("CallumP/TradeSys/Make Post")]
 		//add to component menu
 	public class TradePost : MonoBehaviour
 		{
@@ -17,9 +17,6 @@ namespace TradeSys
 				public List<StockGroup> stock = new List<StockGroup> ();//the stock list
 				public List<MnfctrGroup> manufacture = new List<MnfctrGroup> ();//manufacturing lists
 				public int cash = 10000;//the cash that the trade post has, so can buy and sell items
-				public List<bool> tags = new List<bool> ();//the tags that can be selected for the trade post
-				public List<bool> groups = new List<bool> ();//the groups that the trade post belongs to
-				public List<bool> factions = new List<bool> ();//the factions that the trade post belongs to
 				public bool stopProcesses;//if selected, and the number of an item is more or less than the max / min, then any process requiring the item will stop
 	
 				internal bool updated;//true if the prices have been updated in the current TradeCall
@@ -35,6 +32,10 @@ namespace TradeSys
 				{
 						controller = GameObject.FindGameObjectWithTag (Tags.C).GetComponent<Controller> ();
 						tag = Tags.TP;
+			//make sure that the tags are sorted
+			controller.SortController();
+			controller.SortTags(gameObject, true);
+			controller.SortTags(gameObject, false);
 				}//end Awake
 	
 				public void UpdatePrices ()
@@ -79,7 +80,7 @@ namespace TradeSys
 										}//end for manufacture processes
 								}//end for manufacture groups
 						}//end manufacture allow check
-				}//end Manfuacture Check
+				}//end ManfuactureCheck
 	
 				bool ResourceCheck (int groupID, int processID)
 				{//check that the manufacturing process has enough resources to work, and numbers are not above or below min values if option selected
@@ -218,29 +219,6 @@ namespace TradeSys
 					}else//else if not enough, display error
 						Debug.LogError("Not enough items in stock to remove!");
 				}//end AddGood
-				
-		/// <summary>
-		/// Changes the factions or groups
-		/// </summary>
-		/// <param name="factionsGroups">If set to <c>true</c> will change the factions. Set to <c>false</c> to change groups</param>
-		/// <param name="toChange">The enabled factions or groups</param>
-		public void ChangeFactionsGroups(bool factionsGroups, List<bool> toChange){
-			if((factionsGroups && controller.factions.enabled) || (!factionsGroups && controller.groups.enabled)){//only need to make changes if enabled
-				if(toChange.Count != (factionsGroups?factions.Count:groups.Count)){//if not the same length, give an error
-					Debug.LogError((factionsGroups?"Factions":"Groups")+" list is not the same length as the number of "
-					+(factionsGroups?"factions":"groups")+" available!\nThe changes have not been applied.");
-					return;//return here so dont get an error later
-			}//end if problem with input
-							
-				if(factionsGroups)//make the changes
-					factions = toChange;
-				else
-					groups = toChange;
-					
-				controller.GetClosest();//update the closest posts array for trading
-				controller.SortTraderDestination(this);//sort out any traders enroute to this trade post
-			}//end if factions enabled
-		}//end ChangeFactionsGroups
 				
 		public void MovedPost()
 		{//called when the post has been moved

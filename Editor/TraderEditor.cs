@@ -1,12 +1,10 @@
-﻿#if UNITY_4_0 || UNITY_4_1 || UNITY_4_2
-#define API
-#endif
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEditor;
 using System.Collections;
 using System.Collections.Generic;
+using CallumP.TagManagement;
 
-namespace TradeSys
+namespace CallumP.TradeSys
 {//use namespace to stop any name conflicts
 		[CanEditMultipleObjects, CustomEditor(typeof(Trader))]
 		public class TraderEditor : Editor
@@ -31,7 +29,6 @@ namespace TradeSys
 				private SerializedProperty closeDistance;
 				private SerializedProperty collect;
 				private SerializedProperty item;
-				private SerializedProperty factions;
 				private SerializedProperty manufacturing;
 				private SerializedProperty dropCargo;
 				private SerializedProperty dropSingle;
@@ -61,7 +58,6 @@ namespace TradeSys
 		
 						posts = GameObject.FindGameObjectsWithTag (Tags.TP);
 		
-						factions = traderSO.FindProperty ("factions");
 						manufacturing = traderSO.FindProperty ("manufacture");
 						
 						dropCargo = traderSO.FindProperty ("dropCargo");
@@ -78,14 +74,14 @@ namespace TradeSys
 	
 				public override void OnInspectorGUI ()
 				{
-						#if !API
 						Undo.RecordObject (traderNormal, "TradeSys Trader");
 						EditorGUIUtility.fieldWidth = 30f;
-						#endif	
 						
 						traderSO.Update ();
 						controllerSO.Update ();
-				
+						
+			controllerNormal.SortTags(traderNormal.gameObject, true);//make sure factions there
+			
 						sel = GUITools.Toolbar (sel, new string[] {
 										"Settings",
 										"Items",
@@ -96,11 +92,7 @@ namespace TradeSys
 					#region settings
 						case 0:
 								EditorGUI.indentLevel = 0;
-								if (controllerNormal.factions.enabled)//only show these options if factions are on
-										GUITools.HorizVertOptions (controllerSO.FindProperty ("showHoriz"));//show display options
-					
 								scrollPos.TS = GUITools.StartScroll (scrollPos.TS, smallScroll);
-					
 					
 					#region options
 								if (GUITools.TitleGroup (new GUIContent ("Options", "Set general information for the trader which will affect trading"), controllerSO.FindProperty ("opT"), false)) {//if showing options
@@ -123,11 +115,6 @@ namespace TradeSys
 														bool find = false;//bool so that if not close enough, can display a message
 														for (int p = 0; p<posts.Length; p++) {//go through all posts
 																if (Vector3.Distance (traderNormal.transform.position, posts [p].transform.position) <= closeDistance.floatValue) {//check close enough
-								
-																		#if API
-								Undo.RegisterUndo ((Trader)target, "TradeSys Trader");
-																		#endif
-								
 																		GameObject post = posts [p];
 																		targetPost.objectReferenceValue = post;//set the target
 																		traderSO.ApplyModifiedProperties ();//apply the modified properties so can then move the trader to the location
@@ -140,14 +127,8 @@ namespace TradeSys
 																EditorUtility.DisplayDialog ("No posts found", "No trade posts were found close enough. Try moving the trader closer, or increase the close distance value and try again.", "Ok");
 												}//end find post pressed
 												GUI.enabled = traderNormal.target != null;
-												if (GUILayout.Button (new GUIContent ("Set location", "Set the location of the trader to that of the selected target post"), EditorStyles.miniButtonRight, GUILayout.MaxWidth (GUI.skin.button.CalcSize (new GUIContent ("Set location")).x))) {
-						
-														#if API
-						Undo.RegisterUndo ((Trader)target, "TradeSys Trader");
-														#endif
-						
-														traderNormal.gameObject.transform.position = traderNormal.target.transform.position;
-												}//end if set location pressed
+												if (GUILayout.Button (new GUIContent ("Set location", "Set the location of the trader to that of the selected target post"), EditorStyles.miniButtonRight, GUILayout.MaxWidth (GUI.skin.button.CalcSize (new GUIContent ("Set location")).x)))
+traderNormal.gameObject.transform.position = traderNormal.target.transform.position;
 												GUI.enabled = true;
 												EditorGUILayout.EndHorizontal ();
 										}//end if not expendable
@@ -201,10 +182,6 @@ namespace TradeSys
 						
 								}//end showing options
 								EditorGUILayout.EndVertical ();
-					#endregion
-					#region factions
-								if (controllerNormal.factions.enabled)//check that the factions have been enabled before showing anything
-										GUITools.TGF (controllerNormal, controllerSO, "expandedT", new GUIContent ("Factions", "Select which factions the trader belongs to. In order to be able to trade with a trade post, they both have to have a faction in common"), factions, true, new string[]{}, "factions", "factions");
 					#endregion
 								break;
 					#endregion

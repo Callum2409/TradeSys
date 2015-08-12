@@ -2,9 +2,9 @@
 using System.Collections;
 using System.Collections.Generic;
 
-namespace TradeSys
+namespace CallumP.TradeSys
 {//use namespace to stop any name conflicts
-		[AddComponentMenu("TradeSys/Make Trader")]
+		[AddComponentMenu("CallumP/TradeSys/Make Trader")]
 		//add to component menu
 	public class Trader : MonoBehaviour
 		{
@@ -22,7 +22,6 @@ namespace TradeSys
 				public float stopTime;//how long the trader needs to stop for
 				public float radarDistance;//how far away can the trader see dropped items	
 				public List<ItemGroup> items = new List<ItemGroup> ();//a list where it is possible to select what a trader can and can't carry
-				public List<bool> factions = new List<bool> ();//select which factions the trader belongs to
 				public List<MnfctrGroup> manufacture = new List<MnfctrGroup> ();//manufacturing lists
 				public int tradeType = 0;//0 - standard, 1 - depot backhaul, 2 - depot no backhaul
 				public bool dropCargo;//whether cargo can be dropped or not
@@ -38,6 +37,10 @@ namespace TradeSys
 						spaceRemaining = cargoSpace;//set the space remaining to be the same as the cargo space, because have no cargo
 						
 						expendable = controller.expTraders.enabled;
+						
+						controller.SortController();
+						controller.SortTags(gameObject, true);//make sure factions there
+			
 						
 						InvokeRepeating ("ManufactureCheck", 0, controller.updateInterval);//check for manufacture changes periodically. do this here so expendables can do it too
 				}//end Awake
@@ -202,21 +205,6 @@ namespace TradeSys
 		public void ChangeTraderHome(TradePost post){//used to change which trade post appears as the home post. Only useful for depots
 			homeID = controller.GetPostID(post.gameObject);
 		}//end ChangeTradeHome
-		
-		public void ChangeFactions(List<bool> newFactions){//change the factions that the trader belongs to
-			if(newFactions.Count != factions.Count){//if not the same length, show error
-				Debug.LogError("The entered factions list is not the same as the number of factions available!\nThe changes have not been applied.");
-				return;//return here so no errors later
-			}//end if not same length
-			
-			if(controller.CheckTraderFaction(this, finalPost))//check that the final post is in the home faction, if it is, make changes
-				factions = newFactions;//make changes
-			else if(controller.CheckTraderFaction(this, startPost)){//if final post not same faction, check that the start post is
-				factions = newFactions;//make changes
-				controller.TraderHome(this);//send the trader back home as the factions have changed
-			}else//end start post faction check
-				Debug.LogWarning("The factions have not been changed as neither the final or the start post share the same factions as the trader.");
-		}//end ChangeFactions
 		
 		public void DestroyTrader(){//destroy the trader
 		//this will get called by expendable trader methods but can be used to remove the trader from the game

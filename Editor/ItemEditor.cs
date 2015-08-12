@@ -3,7 +3,7 @@ using UnityEditor;
 using System.Collections;
 using System.Collections.Generic;
 
-namespace TradeSys
+namespace CallumP.TradeSys
 {//use namespace to stop any name conflicts
 		[CanEditMultipleObjects, CustomEditor(typeof(Item))]
 		public class ItemEditor : Editor

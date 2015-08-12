@@ -6,7 +6,7 @@ using UnityEditor;
 using System.Collections;
 using System.Collections.Generic;
 
-namespace TradeSys
+namespace CallumP.TradeSys
 {//use namespace to stop any name conflicts
 		public class TSGUI
 		{		
@@ -323,37 +323,6 @@ namespace TradeSys
 						EditorGUILayout.EndHorizontal ();
 						return sel;
 				}//end Toolbar
-				
-				public void TGF (Controller controller, SerializedObject controllerSO, string pt, GUIContent title, SerializedProperty option, bool factions, string[] names, string name, string nameC)
-				{//show the tags, groups and factions options
-			
-						SerializedProperty expanded = controllerSO.FindProperty (nameC).FindPropertyRelative (pt);
-			
-						if (TitleGroup (title, expanded, true)) {//if showing TGF
-				
-								if (option.arraySize == 0)
-										expanded.boolValue = false;
-				
-								EnableDisable (option, "", false);
-								IndentGroup (1);
-								if (factions) {
-										names = new string[option.arraySize];//need the name of the factions in an array
-										for (int f = 0; f<option.arraySize; f++)
-												names [f] = controller.factions.factions [f].name;
-								}
-								HorizVertDisplay (names, option, controllerSO.FindProperty ("showHoriz").boolValue);
-				
-								EditorGUILayout.EndHorizontal ();
-						}//end if TGF expanded
-						EditorGUILayout.EndVertical ();
-			
-						EditorGUI.indentLevel = 0;
-			
-						if (option.arraySize == 0)
-								EditorGUILayout.HelpBox ("No " + name + " have been added, but " + name + " have been enabled. " + char.ToUpper (name [0]) + name.Substring (1)
-										+ " can be added in the controller", MessageType.Error);
-						EditorGUILayout.EndVertical ();
-				}//end TGF
 		
 				public bool AnyGoods (SerializedProperty goods, string property)
 				{//go through goods groups and see if there are any items

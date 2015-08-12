@@ -3,7 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 
-namespace TradeSys
+namespace CallumP.TradeSys
 {//use namespace to stop any name conflicts
 		public class Tags : MonoBehaviour
 		{//contains all of the tags used in TradeSys
@@ -216,27 +216,6 @@ namespace TradeSys
 		public class ItemGroup
 		{//have the allow items in groups
 				public List<ItemCargo> items = new List<ItemCargo> ();
-		}
-
-		[System.Serializable]
-		public class EnableList
-		{//this is used by post tags and groups, has a bool for allowed and expanded, and a string list
-				public bool enabled, expandedC, expandedP;
-				public List<string> names = new List<string> ();
-		}
-
-		[System.Serializable]
-		public class Factions
-		{//this is used for factions, has enabled and expanded bools, and a list with strings and colours
-				public bool enabled, expandedC, expandedP, expandedT;
-				public List<Faction> factions = new List<Faction> ();
-		}
-
-		[System.Serializable]
-		public class Faction
-		{//contains a string name and a colour for the faction
-				public string name;
-				public Color colour = Color.green;
 		}
 		
 		[System.Serializable]

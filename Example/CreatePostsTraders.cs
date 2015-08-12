@@ -1,7 +1,8 @@
 ﻿using UnityEngine;
 using System.Collections;
+using CallumP.TagManagement;
 
-namespace TradeSys {//use namespace to stop any name conflicts
+namespace CallumP.TradeSys {//use namespace to stop any name conflicts
 	public class CreatePostsTraders : MonoBehaviour {
 	//This is an example script demonstrating how trade posts and traders can be created via code. It is fully commented, so should hopefully help
 	//with editing it in order to get it to suit your needs
@@ -41,19 +42,9 @@ namespace TradeSys {//use namespace to stop any name conflicts
 						}//end if > 0
 					}//end for processes
 				}//end for manufacture groups
-			
-				if (controller.groups.enabled) {//if groups enabled, need to generate the groups
-					for (int g = 0; g<controller.groups.names.Count; g++) {//go through all groups
-						newPost.groups [g] = System.Math.Round (Random.value, System.MidpointRounding.AwayFromZero) == 0 ? true : false;
-						//generate a random value between 0 and 1, round it and use that to decide whether or not a group is selected
-					}//end for groups			
-				}//end if groups enabled
-				if (controller.factions.enabled) {//if factions enabled, need to generate the factions
-					for (int f = 0; f<controller.factions.factions.Count; f++) {//go through all factions
-						newPost.factions[f] = System.Math.Round (Random.value, System.MidpointRounding.AwayFromZero) == 0 ? true : false;
-						//generate a random value between 0 and 1, round it and use that to decide whether or not a faction is selected
-					}//end for groups			
-				}//end if groups enabled
+				
+				SortTags(newPost.gameObject, true);//sort factions
+				SortTags(newPost.gameObject, false);//sort groups
 			}//end for new posts
 			#endregion
 			controller.GetPostScripts ();
@@ -71,15 +62,7 @@ namespace TradeSys {//use namespace to stop any name conflicts
 				newTrader.closeDistance = 0.3f;//set the close distance
 				newTrader.transform.localScale = new Vector3 (0.25f, 0.25f, 0.25f);//scale the cubes so they are smaller than the trade post spheres
 			
-				if (controller.factions.enabled) {//if factions enabled, need to generate the factions
-					for (int f = 0; f<controller.factions.factions.Count; f++) {//go through all factions
-						newTrader.factions[f] = System.Math.Round (Random.value, System.MidpointRounding.AwayFromZero) == 0 ? true : false;
-						//generate a random value between 0 and 1, round it and use that to decide whether or not a faction is selected
-						//NOTE: This may cause TradeSys to tell you that the trader cannot do anything because the faction of the starting post is not the same
-						//so some code would need to be added to check that the factions are similar, and if not then either select a similar faction or a new 
-						//start post
-					}//end for groups			
-				}//end if groups enabled
+				SortTags(newTrader.gameObject, true);
 			}//end for new traders
 			#endregion
 
@@ -87,5 +70,19 @@ namespace TradeSys {//use namespace to stop any name conflicts
 			//without the line above, TradeSys will not do anything!
 			
 		}//end Start
+		
+		void SortTags(GameObject obj, bool factionsGroups)
+		{//go through all of the tags, randomly setting them to be true or false
+			ObjectTags tags = ObjectTags.GetTagComponent(obj, factionsGroups?"Factions":"Groups");//get the tags
+			
+			for(int t = 0; t<tags.tags.Count; t++){//go through all tags
+			SB tag = tags.tags[t];//the current tag
+			if(tag.tagName == "Default")
+			tag.selected = true;
+			else
+					tag.selected = System.Math.Round (Random.value-0.1, System.MidpointRounding.AwayFromZero) == 0;//else set randomly
+					//includes a slight bias to increase probability that at least one is selected
+			}//end for all tags
+		}//end SortTags
 	}//end CreatePostsTraders
 }//end namespace

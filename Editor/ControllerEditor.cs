@@ -1,13 +1,11 @@
-#if UNITY_4_0 || UNITY_4_1 || UNITY_4_2
-#define API
-#endif
 using UnityEngine;
 using UnityEditor;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using CallumP.TagManagement;
 
-namespace TradeSys
+namespace CallumP.TradeSys
 {//use namespace to stop any name conflicts
 		[CanEditMultipleObjects, CustomEditor(typeof(Controller))]
 		public class ControllerEditor : Editor
@@ -19,13 +17,8 @@ namespace TradeSys
 				{
 						GameObject ctrl;
 			
-						#if API
-						Undo.RegisterSceneUndo ("Create Controller");
-						#endif
 						ctrl = new GameObject ();//create the GameObject
-						#if !API
 						Undo.RegisterCreatedObjectUndo (ctrl, "Create Controller");//create the GameObject
-						#endif
 						
 						Controller setup = ctrl.AddComponent<Controller> ();					
 						setup.transform.position = Vector3.zero;//set the position to (0,0,0)
@@ -64,7 +57,6 @@ namespace TradeSys
 				private SerializedProperty goods;
 				private SerializedProperty manufacture;
 				private SerializedProperty closestPosts, buyMultiple, sellMultiple, distanceWeight, profitWeight, purchasePercent, priceUpdates, moveType, expTraders;
-				private SerializedProperty postTags, groups, factions;
 				private SerializedProperty units;
 				bool expendable;
 			#endregion
@@ -136,10 +128,7 @@ namespace TradeSys
 						purchasePercent = controllerSO.FindProperty ("purchasePercent");
 						priceUpdates = controllerSO.FindProperty ("priceUpdates");
 						moveType = controllerSO.FindProperty ("moveType");
-		
-						postTags = controllerSO.FindProperty ("postTags");
-						groups = controllerSO.FindProperty ("groups");
-						factions = controllerSO.FindProperty ("factions");
+						
 						expTraders = controllerSO.FindProperty ("expTraders");
 		
 						units = controllerSO.FindProperty ("units");
@@ -150,10 +139,8 @@ namespace TradeSys
 	
 				public override void OnInspectorGUI ()
 				{
-						#if !API
 						Undo.RecordObject (controllerNormal, "TradeSys Controller");
 						EditorGUIUtility.fieldWidth = 30f;
-						#endif	
 			
 						controllerSO.Update ();//needs to update
 						for (int p = 0; p<postScripts.Length; p++) 
@@ -197,7 +184,9 @@ namespace TradeSys
 								}//end for items
 						}//end for groups
 						#endregion
-		
+						
+						controllerNormal.SortController ();
+						
 						sel.C = GUITools.Toolbar (sel.C, new string[] {
 								"Settings",
 								"Goods",
@@ -299,7 +288,7 @@ namespace TradeSys
 												GUIContent[] moveOptions = new GUIContent[] {
 														new GUIContent ("Random post", "Move to a random post that the trader is able to reach. Not closest because could just be moving between the same trade posts."),
 														new GUIContent ("Items per distance", "Move to a reachable trade post which has the highest value when the number of items the post wants to sell is divided by the distance. " +
-																"The highest value will give the trader the best chance of fining a trade with per unit distance."),
+														"The highest value will give the trader the best chance of fining a trade with per unit distance."),
 														new GUIContent ("Best trade", "Move to the reachable trade post which offers the best trade out of all the reachable trade posts. This requires a lot more computing power and may not result in a valid move.")
 												};
 						
@@ -385,44 +374,75 @@ namespace TradeSys
 								}//end if showing pause options
 								EditorGUILayout.EndVertical ();
 					#endregion
-		
-					#region post tags
-								TGFE (0, new GUIContent ("Post tags", "These can be added to any post, and can be used to affect how the post information is displayed, or what the post does. TradeSys does not do this, but could be useful when developing your scripts"),
-						postTags, "tags", "Tag ");
-					#endregion
-			
-					#region groups
-								TGFE (0, new GUIContent ("Groups", "Restrict which posts a trade post can trade with by selecting groups"),
-						groups, "groups", "Group ");
-					#endregion
-			
-					#region factions
-								GUIContent factionsTitle = new GUIContent ("Factions", "Trade posts and factions can belong to factions, and will only trade if they are in the same faction");
-								
-								if (!expendable)
-										TGFE (1, factionsTitle, factions, "factions", "Faction ");
-								else {//should say that cannot be set while expendable
-										SerializedProperty enabled = factions.FindPropertyRelative ("expandedC");
-										GUITools.TitleGroup (factionsTitle, enabled, false);//show the title group still
-										
-										if (enabled.boolValue)//if showing group
-												EditorGUILayout.LabelField ("Factions are not available when expendable traders have been enabled");
-										factions.FindPropertyRelative ("enabled").boolValue = false;//set to false
-						
-										EditorGUILayout.EndVertical ();
-								}//end else expendable
-					#endregion
 					
 					#region expendable
+								SerializedProperty expanded = expTraders.FindPropertyRelative ("expandedC");
+								SerializedProperty enabled = expTraders.FindPropertyRelative ("enabled");
+				
 								bool before = controllerNormal.expTraders.enabled;
-								TGFE (2, new GUIContent ("Expendable traders", "Create traders to carry cargo from one trade post to another. The trader will be deleted when it arrives at its desitination"),
-					expTraders, "expendable", "Expendable ");
-								expendable = controllerNormal.expTraders.enabled;
+								GUITools.TitleGroup (new GUIContent ("Expendable traders", "Create traders to carry cargo from one trade post to another. The trader will be deleted when it arrives at its desitination"), expanded, false);
+				
+								if (expanded.boolValue) {//show if expanded
+										SerializedProperty traderList = expTraders.FindPropertyRelative ("traders");
+					
+										int number = traderList.arraySize;
+					
+										EditorGUI.indentLevel = 1;
+										EditorGUILayout.PropertyField (enabled, new GUIContent ("Enable expendable traders"));
+					
+										if (enabled.boolValue) {//show only if enabled
+						
+												EditorGUILayout.BeginHorizontal ();
+												SerializedProperty maxNoTraders = expTraders.FindPropertyRelative ("maxNoTraders");
+												EditorGUILayout.PropertyField (maxNoTraders, new GUIContent ("Max traders", "The maximum number of expendable traders allowed. Set this to 0 for infinite."));
+						
+												if (maxNoTraders.intValue < 0)
+														maxNoTraders.intValue = 0;
+						
+												GUILayout.FlexibleSpace ();
+												EditorGUILayout.LabelField ("Number of expendable traders", number.ToString ());
+						
+												if (GUITools.PlusMinus (true)) {
+														traderList.InsertArrayElementAtIndex (number);
+														traderList.GetArrayElementAtIndex (number).objectReferenceValue = null;
+												}//if add pressed
+						
+												EditorGUILayout.EndHorizontal ();		
+						
+												if (number > 0) {//check that there are options to show
+														GUITools.IndentGroup (2);
+														for (int o = 0; o<number; o++) {//for all options
+																SerializedProperty cO = traderList.GetArrayElementAtIndex (o);//current trader
+								
+																EditorGUILayout.BeginHorizontal ();
+								
+																if (cO.objectReferenceValue == null)//check if null and make red
+																		GUI.color = Color.red;//makre red if null
+								
+																EditorGUILayout.PropertyField (cO, new GUIContent ());//show editable name field
+																GUI.color = Color.white;//set back to normal
+								
+																if (GUITools.PlusMinus (false)) {
+									
+																		cO.objectReferenceValue = null;//needs to be set to null before it can be deleted
+																		traderList.DeleteArrayElementAtIndex (o);
+																		break;
+																}//end if minus pressed
+																EditorGUILayout.EndHorizontal ();
+														}//end for all traders
+														EditorGUILayout.EndVertical ();
+														EditorGUILayout.EndHorizontal ();
+												}//end if showing something
+										}//end if enabled
+								}//end if expanded
+								EditorGUILayout.EndVertical ();
+				
 								if (!before && expendable)
 										controllerNormal.SortTraders ();//need to sort the traders if just enabled them again
-					#endregion
-			
-					#region units
+				
+				#endregion
+				
+				#region units
 								if (GUITools.TitleGroup (new GUIContent ("Units", "Set the different units that can be used for the weights of goods. The unit min max must increase down the list, so the max of the first is the same as the min of the one after it"), units.FindPropertyRelative ("expanded"), false)) {//show the units
 			
 										SerializedProperty unitInfo = units.FindPropertyRelative ("units");
@@ -433,10 +453,6 @@ namespace TradeSys
 										GUILayout.Space (10f);
 												
 										if (GUILayout.Button (new GUIContent ("g, kg, t", "Set up metric units of g, kg and t. 1 = 1 kg"), EditorStyles.miniButton)) {
-													
-												#if API
-													Undo.RegisterUndo ((Controller)target, "TradeSys Controller");
-												#endif
 													
 												controllerNormal.units = new Units{expanded = true, units = new List<Unit>{new Unit{suffix = "g", min = 0.000001f, max = 0.001f},
 																																new Unit{suffix = "kg", min = 0.001f, max = 1f},
@@ -948,11 +964,6 @@ namespace TradeSys
 												EditorGUILayout.BeginHorizontal ();
 												EditorGUILayout.LabelField ("Needing", EditorStyles.boldLabel);
 												if (GUITools.PlusMinus (true)) {//add needing element
-																
-														#if API
-													Undo.RegisterUndo ((Controller)target, "TradeSys Controller");
-														#endif
-													
 														controllerNormal.manufacture [selMG.intValue].manufacture [m].needing.Add (new NeedMake ());
 														controllerNormal.manufacture [selMG.intValue].manufacture [m].needing [controllerNormal.manufacture [selMG.intValue].manufacture [m].needing.Count - 1].number = 1;
 												}
@@ -964,11 +975,6 @@ namespace TradeSys
 												EditorGUILayout.BeginHorizontal ();
 												EditorGUILayout.LabelField ("Making", EditorStyles.boldLabel);
 												if (GUITools.PlusMinus (true)) {//add making element
-																
-														#if API
-													Undo.RegisterUndo ((Controller)target, "TradeSys Controller");
-														#endif
-													
 														controllerNormal.manufacture [selMG.intValue].manufacture [m].making.Add (new NeedMake ());
 														controllerNormal.manufacture [selMG.intValue].manufacture [m].making [controllerNormal.manufacture [selMG.intValue].manufacture [m].making.Count - 1].number = 1;
 												}
@@ -1001,11 +1007,6 @@ namespace TradeSys
 				///this is to go through the manufacturing lists made, and make sure that each itemID is still pointing to the correct one
 				void SortLists (int groupNo)
 				{
-						
-						#if API
-													Undo.RegisterUndo ((Controller)target, "TradeSys Controller");
-						#endif
-													
 						Goods[] before = controllerNormal.goods [groupNo].goods.ToArray ();
 						controllerNormal.goods [groupNo].goods.Sort ();
 	
@@ -1473,124 +1474,7 @@ namespace TradeSys
 								}//end for needing
 						}//end enabled check
 				}//end NumberChange
-	
-				///the GUI used for adding and removing tags, groups, factions, expendable traders
-				///int option
-				///0 = tags, groups
-				///1 = factions
-				///2 = expendable
-				void TGFE (int option, GUIContent title, SerializedProperty options, string plural, string singleCapSpace)
-				{
-						SerializedProperty expanded = options.FindPropertyRelative ("expandedC");
-						SerializedProperty enabled = options.FindPropertyRelative ("enabled");
-			
-						GUITools.TitleGroup (title, expanded, false);
 		
-						if (expanded.boolValue) {//show if expanded
-								SerializedProperty optionInfo = null;
-								switch (option) {//different options have different optionInfos
-								case 0:
-										optionInfo = options.FindPropertyRelative ("names");
-										break;
-								case 1:
-										optionInfo = options.FindPropertyRelative ("factions");
-										break;
-								case 2:
-										optionInfo = options.FindPropertyRelative ("traders");
-										break;
-								}//end switch options
-										
-								int number = optionInfo.arraySize;
-			
-								EditorGUI.indentLevel = 1;
-								if (enabled.boolValue && option != 2)//only have the horizontal if showing other info too and not expendable
-										EditorGUILayout.BeginHorizontal ();
-								EditorGUILayout.PropertyField (enabled, new GUIContent ("Enable " + plural));
-		
-								if (enabled.boolValue) {//show only if enabled
-					
-										if (option == 2) {//if is expendable, need to show couple of other options
-												EditorGUILayout.BeginHorizontal ();
-												SerializedProperty maxNoTraders = options.FindPropertyRelative ("maxNoTraders");
-												EditorGUILayout.PropertyField (maxNoTraders, new GUIContent ("Max traders", "The maximum number of expendable traders allowed. Set this to 0 for infinite."));
-						
-												if (maxNoTraders.intValue < 0)
-														maxNoTraders.intValue = 0;
-										}//end if expendable		
-					
-										GUILayout.FlexibleSpace ();
-										EditorGUILayout.LabelField ("Number of " + plural, number.ToString ());
-				
-										if (GUITools.PlusMinus (true)) {
-												optionInfo.InsertArrayElementAtIndex (number);
-												SerializedProperty inserted = optionInfo.GetArrayElementAtIndex (number);
-				
-												switch (option) {//different option types have different requirements
-												case 0:
-														inserted.stringValue = singleCapSpace + number;
-														break;
-												case 1:
-														inserted.FindPropertyRelative ("name").stringValue = "Faction " + number;
-														inserted.FindPropertyRelative ("colour").colorValue = Color.green;
-														break;
-												case 2:
-														inserted.objectReferenceValue = null;
-														break;
-												}//end switch for different options
-				
-												if (option != 2) {//only need to update posts and traders if isnt expendable
-														for (int p = 0; p<postScripts.Length; p++)//add the new element to all trade posts
-																postScripts [p].FindProperty (plural).InsertArrayElementAtIndex (number);
-														if (option == 1) {//only need to update trader information if factions are being edited
-																for (int t = 0; t<traderScripts.Length; t++) 
-																		traderScripts [t].FindProperty ("factions").InsertArrayElementAtIndex (number);
-														}//end if factions
-												}//end if not expendable
-										}//if add pressed
-				
-										EditorGUILayout.EndHorizontal ();		
-										if (number > 0) {//check that there are options to show
-												GUITools.IndentGroup (2);
-												for (int o = 0; o<number; o++) {//for all options
-														SerializedProperty cO = optionInfo.GetArrayElementAtIndex (o);//current option
-														SerializedProperty cON = cO;//current option name - only really useful if is showing factions
-														if (option == 1)
-																cON = cO.FindPropertyRelative ("name");
-																						
-														EditorGUILayout.BeginHorizontal ();
-														
-														if (option == 2 && cON.objectReferenceValue == null)//if expendable, check if null and make red
-																GUI.color = Color.red;//makre red if null
-														
-														EditorGUILayout.PropertyField (cON, new GUIContent ());//show editable name field
-														GUI.color = Color.white;//set back to normal
-						
-														if (option == 1)//only need to show colour option if it is the faction
-																EditorGUILayout.PropertyField (cO.FindPropertyRelative ("colour"), new GUIContent (), GUILayout.MaxWidth (100f));
-							
-														if (GUITools.PlusMinus (false)) {
-																if (option != 2) {//only need to update posts and traders if not expendable
-																		for (int p = 0; p<postScripts.Length; p++) 
-																				postScripts [p].FindProperty (plural).DeleteArrayElementAtIndex (o);
-																		if (option == 1) {//only need to update trader information if factions are being edited
-																				for (int t = 0; t<traderScripts.Length; t++)
-																						traderScripts [t].FindProperty ("factions").DeleteArrayElementAtIndex (o);
-																		}//end if factions
-																} else//end if not expendable
-																		cON.objectReferenceValue = null;//needs to be set to null before it can be deleted
-																optionInfo.DeleteArrayElementAtIndex (o);
-																break;
-														}//end if minus pressed
-														EditorGUILayout.EndHorizontal ();
-												}//end for all options
-												EditorGUILayout.EndVertical ();
-												EditorGUILayout.EndHorizontal ();
-										}//end if showing something
-								}//end if enabled
-						}//end if expanded
-						EditorGUILayout.EndVertical ();
-				}//end TGFE
-	
 				///check whether the value is infinity
 				bool InfinityCheck (string minMax)
 				{
@@ -1637,7 +1521,18 @@ namespace TradeSys
 				
 				bool CheckMan ()
 				{//check that all of the manufacturing processes point to an item, returns false if not
-						//	for(int g = 0; g<con)
+						for (int g = 0; g<controllerNormal.manufacture.Count; g++) {//for all groups
+								for (int p = 0; p<controllerNormal.manufacture[g].manufacture.Count; p++) {//for all processes
+										for (int n = 0; n<controllerNormal.manufacture[g].manufacture[p].needing.Count; n++) {//for all needing
+												if (controllerNormal.manufacture [g].manufacture [p].needing [n].itemID == -1)
+														return false;
+										}//end for needing
+										for (int m = 0; m<controllerNormal.manufacture[g].manufacture[p].making.Count; m++) {//for all making
+												if (controllerNormal.manufacture [g].manufacture [p].making [m].itemID == -1)
+														return false;
+										}//end for making
+								}//end for processes
+						}//end for groups
 						return true;
 				}//end CheckMan
 		}//end ControllerEditor

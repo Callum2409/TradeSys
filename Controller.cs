@@ -2,8 +2,9 @@ using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using CallumP.TagManagement;
 
-namespace TradeSys
+namespace CallumP.TradeSys
 {//use namespace to stop any name conflicts
 		public class Controller : MonoBehaviour
 		{
@@ -43,6 +44,7 @@ namespace TradeSys
 				public int moveType = 0;//the different move options the traders have
 				//0 = random
 				//1 = max(number to sell / distance)
+				//2 = best trade
 	
 				public int pauseOption = 0;	//the selected pause option
 				public float pauseTime;//the time to pause for
@@ -59,10 +61,6 @@ namespace TradeSys
 				
 				public Spawner[] spawners;//all of the spawner scripts in the game
 	
-				public EnableList postTags;//all of the tags that can be selected by a trade post
-				public EnableList groups;//the different groups that a trade post can be in
-				public Factions factions;//the different factions that a trade post and trader can be in
-	
 				public Units units;//the different units that can be used
 		#endregion
 	
@@ -74,6 +72,7 @@ namespace TradeSys
 				internal int traderCount;
 				Trade[] tradeLists;//this contains all of the buy and sell items at each trade post
 				//needmake has this info, so uses that instead of a new class
+				TagManager groups, factions;//the TagManagers for the groups and factions
 		#endregion
 		#endregion	
 	
@@ -98,6 +97,8 @@ namespace TradeSys
 										}//end for all items
 								}//end for goods groups
 						}//end if need to sort crates
+						
+						SortController();
 						
 						if (expTraders.enabled)//if expendable, set the profit weight to be 0
 								profitWeight = 0;
@@ -143,7 +144,7 @@ namespace TradeSys
 								trader.startPost = trader.finalPost = postScripts [postID];
 						}//end go through traders
 						
-						if (!expTraders.enabled) {//if expendable, check not null
+						if (expTraders.enabled) {//if expendable, check not null
 								for (int t = 0; t<expTraders.traders.Count; t++) {//go through all expendable and check arent null
 										if (expTraders.traders [t] == null) {//check if null
 												Debug.LogError ("One or more expendable traders have been set to null");
@@ -232,44 +233,13 @@ namespace TradeSys
 		#region faction group check
 				public bool CheckFactionsGroups (TradePost post1, TradePost post2)
 				{//check that the posts have a same group and faction
-						if (CheckFactions (post1, post2) && CheckGroups (post1, post2))
-								return true;
-						else
-								return false;
+						return TagManager.ShareEnabled (post1.gameObject, post2.gameObject, "Factions") && 
+								TagManager.ShareEnabled (post1.gameObject, post2.gameObject, "Groups");
 				}//end CheckFactionsGroups
-	
-				bool CheckFactions (TradePost post1, TradePost post2)
-				{//check in same faction
-						if (factions.enabled) {//check if factions enabled
-								for (int f = 0; f<factions.factions.Count; f++)//go through factions
-										if (post1.factions [f] && post2.factions [f])//if both have the factions enabled
-												return true;
-								return false;//if no factions match, return false
-						} else//end if factions enabled
-								return true;
-				}//CheckFactions
-	
-				bool CheckGroups (TradePost post1, TradePost post2)
-				{//Check in same group
-						if (groups.enabled) {//check if groups enabled
-								for (int g = 0; g<groups.names.Count; g++)//go through groups
-										if (post1.groups [g] && post2.groups [g])//if both have the groups enabled
-												return true;
-								return false;//if no groups match, return false
-						} else//end if groups enanled
-								return true;
-				}//CheckGroups
-	
+				
 				public bool CheckTraderFaction (Trader trader, TradePost post)
-				{//Check that the trader is in the same faction as the trade post
-						if (factions.enabled) {//check if factions enabled
-								for (int f = 0; f<factions.factions.Count; f++) {//go through factions
-										if (trader.factions [f] && post.factions [f])//if both have the factions enabled
-												return true;
-								}//end for factions
-								return false;//if no factions match, return false
-						} else//end if factions enabled
-								return true;
+				{//Check that the trader is in the same faction as the trade post		
+						return TagManager.ShareEnabled (trader.gameObject, post.gameObject, "Factions");
 				}//end CheckTraderFaction
 		#endregion
 	
@@ -344,11 +314,27 @@ namespace TradeSys
 						if (!expTraders.enabled)//if not expendable, get the trader scripts
 								GetTraderScripts ();
 				
+						SortController ();
 						SortTradePosts ();
 						SortTraders ();
 						SortSpawners ();
 						ManufactureMass ();
 				}//end SortAll
+				
+				public void SortController ()
+				{//make sure the controller has the groups and factions tags
+						factions = TagManager.GetManager (gameObject, "Factions");
+						if (factions == null) {//if not found the group, needs to make one
+								factions = gameObject.AddComponent<TagManager> ();//add the tag manager
+								factions.Init ("Factions", "Faction", "factions", true, true, 1, new SC[]{new SC (){tagName = "Default", colour = Color.green}});//initialise
+						}//end if no factions tag manager
+			
+						groups = TagManager.GetManager (gameObject, "Groups");
+						if (groups == null) {//if not found the group, needs to make one
+								groups = gameObject.AddComponent<TagManager> ();//add the tag manager
+								groups.Init ("Groups", "Group", "groups", true, false, 1, new SC[]{new SC (){tagName = "Default"}});//initialise
+						}//end if no groups tag manager
+				}//end SortController
 	
 				public void SortTradePosts ()
 				{//make sure that all trade posts have the required settings
@@ -387,35 +373,8 @@ namespace TradeSys
 										thisPost.manufacture [m].manufacture.RemoveRange (manufacture [m].manufacture.Count, thisPost.manufacture [m].manufacture.Count - manufacture [m].manufacture.Count);
 						}
 						#endregion
-	
-						#region sort tags
-						if (postTags.enabled) {//only need to sort if enabled
-								while (thisPost.tags.Count<postTags.names.Count)//while not enough tags
-										thisPost.tags.Add (false);
-								if (thisPost.tags.Count > postTags.names.Count)//if too many tags
-										thisPost.tags.RemoveRange (postTags.names.Count, thisPost.tags.Count - postTags.names.Count);
-						}//end if enabled
-						#endregion
-		
-						#region sort groups
-						if (groups.enabled) {//only need to sort if enabled
-								while (thisPost.groups.Count<groups.names.Count)//while not enough groups
-										thisPost.groups.Add (false);
-								if (thisPost.groups.Count > groups.names.Count)//if too many groups
-										thisPost.groups.RemoveRange (groups.names.Count, thisPost.groups.Count - groups.names.Count);
-						}//end if enabled
-						#endregion
-		
-						#region sort factions
-						if (factions.enabled) {//only need to sort if enabled
-								while (thisPost.factions.Count<factions.factions.Count)//while not enough factions
-										thisPost.factions.Add (false);
-								if (thisPost.factions.Count > factions.factions.Count)//if too many factions
-										thisPost.factions.RemoveRange (factions.factions.Count, thisPost.factions.Count - factions.factions.Count);
-						}//end if enabled
-						#endregion
 				}//end SortTradePost
-	
+		
 				public void SortTraders ()
 				{//make sure that all of the traders have the required settings
 						for (int t = 0; t<traderCount; t++)
@@ -453,17 +412,17 @@ namespace TradeSys
 										thisTrader.manufacture [m].manufacture.RemoveRange (manufacture [m].manufacture.Count, thisTrader.manufacture [m].manufacture.Count - manufacture [m].manufacture.Count);
 						}
 						#endregion
-						
-						#region factions
-						if (factions.enabled) {//only need to sort if factions enabled
-								while (thisTrader.factions.Count<factions.factions.Count)//while not enough factions
-										thisTrader.factions.Add (false);
-								if (thisTrader.factions.Count > factions.factions.Count)//if too many factions
-										thisTrader.factions.RemoveRange (factions.factions.Count, thisTrader.factions.Count - factions.factions.Count);
-						}//end if factions enabled
-						#endregion
 				}//end SortTrader
 				
+				public ObjectTags SortTags (GameObject obj, bool factionsGroups)
+				{//sort the goods and factions tags for the given trade post=
+						ObjectTags fg = ObjectTags.GetTagComponent (obj.gameObject, factionsGroups ? "Factions" : "Groups");
+						if (fg == null) //if not found factions or groups component
+								fg = obj.gameObject.AddComponent<ObjectTags> ();
+						fg.Init (true, factionsGroups ? factions : groups);//run the init to make sure settings are correct
+						return fg;	
+				}//end SortTags
+		
 				public void SortSpawners ()
 				{//make sure that all of the spawners have the required settings
 						GameObject[] spawnerObjects = GameObject.FindGameObjectsWithTag (Tags.S);
@@ -682,7 +641,7 @@ namespace TradeSys
 				{//move to a random post. is here as is called by best trades if none can be found
 						if (CheckTraderFaction (trader, postScripts [traderPostID])) {//check that the trader is in the same faction as the trade post in the first place
 								Distances[] reachable = System.Array.FindAll<Distances> (closest [traderPostID], x => (x.post != -1) && CheckTraderFaction (trader, postScripts [x.post]) && 
-										postScripts [x.post].allowTrades);//get all of the reachable posts
+										postScripts [x.post].allowTrades && CheckFactionsGroups (postScripts [traderPostID], postScripts [x.post]));//get all of the reachable posts
 								//make the reachable array up of posts that are possible to get to, by making sure not -1 and in the same faction
 								if (reachable.Length == 0) {
 										Debug.LogError (trader.name + " has no reachable posts! This may be due to incorrect factions or groups");
@@ -703,7 +662,7 @@ namespace TradeSys
 						return -1;//if not found, return -1
 				}//end GetPostID
 	
-				void UpdateLists (int postID)
+				public void UpdateLists (int postID)
 				{//for the current post, update the sell lists, for each of the closest posts, update the buy lists
 						#region price updates
 						//price updates are called here so that they are not pointlessly called in each update interval
@@ -852,42 +811,40 @@ namespace TradeSys
 						for (int p1 = 0; p1<tradePostCount; p1++) {//go through trade posts
 								for (int p2 = p1+1; p2<tradePostCount; p2++) {//go through possible connection posts
 										if (CheckFactionsGroups (postScripts [p1], postScripts [p2])) {//check in the same faction / group
-												if (!factions.enabled) {//if factions not enabled, then only green lines
-														if (Application.isPlaying && showLinesInGame) {//if is playing, use line renderer
-																LineRenderer line = new GameObject ().AddComponent<LineRenderer> ();
-																line.transform.parent = transform;
-																line.material = new Material (Shader.Find ("Self-Illumin/Diffuse"));
-																line.material.color = Color.green;
-																line.SetPosition (0, tradePosts [p1].transform.position);
-																line.SetPosition (1, tradePosts [p2].transform.position);
+												List<Color> colours = new List<Color> ();
+														
+												ObjectTags post1 = ObjectTags.GetTagComponent (tradePosts [p1].gameObject, "Factions");
+												ObjectTags post2 = ObjectTags.GetTagComponent (tradePosts [p2].gameObject, "Factions");
+														
+												if (post1 == null || post2 == null) {
+														SortAll ();//need to sort everything
+														return;//return while everything should be sorted
+												}
+														
+												TagManager factionManager = post1.connected;
+														
+												for (int f = 0; f<factionManager.nameCol.Count; f++) {//go through all factions seeing if enabled
+														if (post1.tags [f].selected && post2.tags [f].selected)//if in the same faction
+																colours.Add (factionManager.nameCol [f].colour);//add the colour to the list
+												}//end for factions
+														
+												int coloursCount = colours.Count;//the number of colours
+												Vector3 line = (tradePosts [p2].transform.position - tradePosts [p1].transform.position) / coloursCount;//work out the angle of the line
+												//now has got all of the colours to be shown
+												for (int c = 0; c<coloursCount; c++) {//go through all of the colours
+														if (Application.isPlaying && showLinesInGame) {//is is playing, use line renderer
+																LineRenderer linef = new GameObject ().AddComponent<LineRenderer> ();
+																linef.transform.parent = transform;
+																linef.name = tradePosts [p1].name + " " + tradePosts [p2].name + " " + c;
+																linef.material = new Material (Shader.Find ("Self-Illumin/Diffuse"));
+																linef.material.color = colours [c];
+																linef.SetPosition (0, (line * c) + tradePosts [p1].transform.position);
+																linef.SetPosition (1, (line * (c + 1)) + postScripts [p1].transform.position);
 														} else {//else in editor
-																Gizmos.color = Color.green;
-																Gizmos.DrawLine (tradePosts [p1].transform.position, tradePosts [p2].transform.position);
+																Gizmos.color = colours [c];//set the colour
+																Gizmos.DrawLine ((line * c) + tradePosts [p1].transform.position, (line * (c + 1)) + postScripts [p1].transform.position);
 														}//end else in editor
-												} else {//else, needs to get the colours of the factions
-														List<Color> colours = new List<Color> ();
-														for (int f = 0; f<factions.factions.Count; f++) {//go through factions, getting the colour if the faction matches
-																if (postScripts [p1].factions [f] && postScripts [p2].factions [f])//check in the same faction
-																		colours.Add (factions.factions [f].colour);//add the colour to the list
-														}//end for factions
-														int coloursCount = colours.Count;//the number of colours
-														Vector3 line = (tradePosts [p2].transform.position - tradePosts [p1].transform.position) / coloursCount;//work out the angle of the line
-														//now has got all of the colours to be shown
-														for (int c = 0; c<coloursCount; c++) {//go through all of the colours
-																if (Application.isPlaying && showLinesInGame) {//is is playing, use line renderer
-																		LineRenderer linef = new GameObject ().AddComponent<LineRenderer> ();
-																		linef.transform.parent = transform;
-																		linef.name = tradePosts [p1].name + " " + tradePosts [p2].name + " " + c;
-																		linef.material = new Material (Shader.Find ("Self-Illumin/Diffuse"));
-																		linef.material.color = colours [c];
-																		linef.SetPosition (0, (line * c) + tradePosts [p1].transform.position);
-																		linef.SetPosition (1, (line * (c + 1)) + postScripts [p1].transform.position);
-																} else {//else in editor
-																		Gizmos.color = colours [c];//set the colour
-																		Gizmos.DrawLine ((line * c) + tradePosts [p1].transform.position, (line * (c + 1)) + postScripts [p1].transform.position);
-																}//end else in editor
-														}//end for all colours
-												}//end else other colours
+												}//end for all colours
 										}//end for p2
 								}//end for p1
 						}//end if in the same faction / group
@@ -1006,5 +963,85 @@ namespace TradeSys
 						
 						GetClosest ();//update the closest posts
 				}//end RemovePost
+				
+				public TradePost PostBuyNearest (TradePost currentPost, int groupID, int itemID)
+				{//find the nearest trade post that you can buy the item from
+						Distances[] toCheck = DistWithCur (currentPost);
+						for (int p = 0; p<toCheck.Length; p++) {//go through all closest posts
+								TradePost post = postScripts [toCheck [p].post];
+								if (post.allowTrades && post.stock [groupID].stock [itemID].sell && post.stock [groupID].stock [itemID].number > 0)
+										return post;//if post is trading, can sell the item to purchaser and has the item in stock
+						}//end for closest posts
+						return null;//return null if none found
+				}//end PostBuyNearest
+				
+				public TradePost PostSellNearest (TradePost currentPost, int groupID, int itemID)
+				{//find the nearest trade post that you can sell the item to
+						Distances[] toCheck = DistWithCur (currentPost);
+						for (int p = 0; p<toCheck.Length; p++) {//go through all closest posts
+								TradePost post = postScripts [toCheck [p].post];
+								if (post.allowTrades && post.stock [groupID].stock [itemID].buy)
+										return post;//if post is trading, can sell the item to purchaser and has the item in stock
+						}//end for closest posts
+						return null;//return null if none found
+				}//end PostSellNearest
+		
+				public TradePost PostBuyCheapest (TradePost currentPost, int groupID, int itemID)
+				{//find the cheapest post to buy from
+						Distances[] toCheck = DistWithCur (currentPost);
+						int bestPrice = int.MaxValue;
+						TradePost bestPost = new TradePost ();
+						for (int p = 0; p<toCheck.Length; p++) {//go through all closest posts
+								TradePost post = postScripts [toCheck [p].post];
+								if (post.allowTrades && post.stock [groupID].stock [itemID].sell && post.stock [groupID].stock [itemID].number > 0) {
+										post.UpdateSinglePrice (groupID, itemID);//update the price of the item
+										if (post.stock [groupID].stock [itemID].price < bestPrice) {//if is cheaper
+												bestPrice = post.stock [groupID].stock [itemID].price;
+												bestPost = post;
+										}//end if cheaper
+								}//end if can buy from post
+						}//end for closest posts
+						return bestPost;//return null if none found
+				}//end PostBuyCheapest
+		
+				public TradePost PostSellExpensive (TradePost currentPost, int groupID, int itemID)
+				{//find the post which will pay the most to buy the item
+						Distances[] toCheck = DistWithCur (currentPost);
+						int bestPrice = 0;
+						TradePost bestPost = new TradePost ();
+						for (int p = 0; p<toCheck.Length; p++) {//go through all closest posts
+								TradePost post = postScripts [toCheck [p].post];
+								if (post.allowTrades && post.stock [groupID].stock [itemID].buy) {
+										post.UpdateSinglePrice (groupID, itemID);//update the price of the item
+										if (post.stock [groupID].stock [itemID].price > bestPrice) {//if is more expensive
+												bestPrice = post.stock [groupID].stock [itemID].price;
+												bestPost = post;
+										}//end if more expensive
+								}//end if can sell to post
+						}//end for closest posts
+						return bestPost;//return null if none found
+				}//end PostSellExpensive
+		
+				Distances[] DistWithCur (TradePost currentPost)
+				{//get the distances array but add the current post to the start
+						int postID = currentPost.postID;//get the postID
+						//make a new distances array to check with the current post at the start of it
+						Distances[] toCheck = new Distances[closestPosts + 1];
+						toCheck [0] = new Distances (){post = postID};
+						System.Array.Copy (closest [postID], toCheck, closest [postID].Length);
+			
+						return toCheck;
+				}//end DistWithCur
+		
+				public List<BuySell> PostWantBuySell (TradePost post, bool buySell)
+				{//update the trade lists and return the buy list
+						int postID = post.postID;//get the postID
+						
+						UpdateLists (postID);//update the lists
+						
+						if (buySell)
+								return tradeLists [postID].buy;//return the buy list
+						return tradeLists [postID].sell;//return the sell list
+				}//end PostWantBuy
 		}//end Controller
 }//end namespace

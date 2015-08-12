@@ -1,9 +1,9 @@
 using UnityEngine;
 using System.Collections;
 
-namespace TradeSys
+namespace CallumP.TradeSys
 {//use namespace to stop any name conflicts
-	[AddComponentMenu("TradeSys/Make Item")]
+	[AddComponentMenu("CallumP/TradeSys/Make Item")]
 	//add to component menu
 		public class Item : MonoBehaviour
 		{

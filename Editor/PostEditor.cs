@@ -1,13 +1,11 @@
-﻿#if UNITY_4_0 || UNITY_4_1 || UNITY_4_2
-#define API
-#endif
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEditor;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using CallumP.TagManagement;
 
-namespace TradeSys
+namespace CallumP.TradeSys
 {//use namespace to stop any name conflicts
 		[CanEditMultipleObjects, CustomEditor(typeof(TradePost))]
 		public class PostEditor : Editor
@@ -31,7 +29,6 @@ namespace TradeSys
 				private SerializedProperty manufacturing;
 				private SerializedProperty controllerMan;
 				private SerializedProperty customPricing, cash;
-				private SerializedProperty tags, groups, factions;
 				private SerializedProperty stopProcesses;
 				private SerializedProperty allowTrades, allowMan;
 				bool expendable;
@@ -59,10 +56,6 @@ namespace TradeSys
 						customPricing = postSO.FindProperty ("customPricing");
 						cash = postSO.FindProperty ("cash");	
 		
-						tags = postSO.FindProperty ("tags");
-						groups = postSO.FindProperty ("groups");
-						factions = postSO.FindProperty ("factions");	
-		
 						stopProcesses = postSO.FindProperty ("stopProcesses");
 						allowTrades = postSO.FindProperty ("allowTrades");
 						allowMan = postSO.FindProperty ("allowManufacture");
@@ -78,14 +71,16 @@ namespace TradeSys
 	
 				public override void OnInspectorGUI ()
 				{
-						#if !API
 						Undo.RecordObject (postNormal, "TradeSys Trade Post");
 						EditorGUIUtility.fieldWidth = 30f;
-						#endif	
 							
 						postSO.Update ();
 						controllerSO.Update ();
 						
+						//make sure that the tags are sorted
+						controllerNormal.SortTags(postNormal.gameObject, true);
+			controllerNormal.SortTags(postNormal.gameObject, false);
+			
 						sel = GUITools.Toolbar (sel, new string[] {
 								"Settings",
 								"Stock",
@@ -96,9 +91,6 @@ namespace TradeSys
 				#region settings
 						case 0:
 								EditorGUI.indentLevel = 0;
-								if (controllerNormal.factions.enabled || controllerNormal.groups.enabled)//only have horiz vert if showing factions or groups
-										GUITools.HorizVertOptions (controllerSO.FindProperty ("showHoriz"));//show display options
-			
 								scrollPos.PS = GUITools.StartScroll (scrollPos.PS, smallScroll);
 		
 					#region options
@@ -121,21 +113,6 @@ namespace TradeSys
 										EditorGUILayout.EndHorizontal ();
 								}//end if showing options
 								EditorGUILayout.EndVertical ();
-					#endregion
-			
-					#region tags
-								if (controllerNormal.postTags.enabled)//check that tags have been enabled before showing anything
-										GUITools.TGF (controllerNormal, controllerSO, "expandedP", new GUIContent ("Post tags", "Select what tags the trade post should have. This doesn't do anything, but allows you to write code that changes how the trade post buy sell / window changes based on what the tag is"), tags, false, controllerNormal.postTags.names.ToArray (), "tags", "postTags");
-					#endregion
-			
-					#region groups
-								if (controllerNormal.groups.enabled)//check that groups have been enabled before showing anything
-										GUITools.TGF (controllerNormal, controllerSO, "expandedP", new GUIContent ("Groups", "Select which groups the trader belongs to. In order to be able to trade with another post, they both have to have a group in common"), groups, false, controllerNormal.groups.names.ToArray (), "groups", "groups");
-					#endregion
-			
-					#region factions
-								if (controllerNormal.factions.enabled)//check that the factions have been enabled before showing anything
-										GUITools.TGF (controllerNormal, controllerSO, "expandedP", new GUIContent ("Factions", "Select which factions the trade post belongs to. In order to be able to trade with another post, they both have to have a faction in common"), factions, true, new string[]{}, "factions", "factions");
 					#endregion
 								break;
 				#endregion
