@@ -3,16 +3,22 @@ using UnityEditor;
 using System.Collections;
 using System.Collections.Generic;
 
-[CustomEditor(typeof(TradePost)), CanEditMultipleObjects]
+[CustomEditor(typeof(TradePost))]
 public class PostEditor : Editor
 {
 	Controller controller;
 	TradePost post;
+	GameObject[] posts;
+	TradePost[] postScripts;
 	
 	void Awake ()
 	{
 		controller = GameObject.Find ("Controller").GetComponent<Controller> ();
 		post = (TradePost)target;
+		posts = GameObject.FindGameObjectsWithTag ("Trade Post");
+		postScripts = new TradePost[posts.Length];
+		for (int p = 0; p<posts.Length; p++)
+			postScripts[p] = posts[p].GetComponent<TradePost>();
 	}
 	
 	public override void OnInspectorGUI ()
@@ -26,57 +32,127 @@ public class PostEditor : Editor
 		#region settings
 		if (controller.selP == 0) {
 			EditorGUI.indentLevel = 0;
+			
+			if (controller.showR) 
+				controller.showRP = EditorGUILayout.Toggle ("Show trade routes", controller.showRP);
+			
+			EditorGUILayout.BeginHorizontal ();
+			controller.showHoriz = EditorGUILayout.Toggle (new GUIContent ("Show items vertically", "When enabling or disabling " +
+			"items at trade posts and spawners, show ascending vertically"), controller.showHoriz, "Radio");
+			controller.showHoriz = !EditorGUILayout.Toggle (new GUIContent ("Show items horizontally", "When enabling or disabling " +
+			"items at trade posts and spawners, show ascending horizontally"), !controller.showHoriz, "Radio");
+			EditorGUILayout.EndHorizontal ();
+			#region groups
+			EditorGUI.indentLevel = 0;
 			EditorGUILayout.BeginVertical ("HelpBox");
 			controller.showPG = EditorGUILayout.Foldout (controller.showPG, "Groups");
 			if (controller.showPG) {
-				EditorGUI.indentLevel = 1;
-				if (controller.allowGroups && controller.groups.Count > 0 && post.groups.Count > 0) {
-					post.groups [0].allow = true;
-					for (int g = 0; g< post.groups.Count; g++) {
-						if (g == 0 || post.groups [g - 1].allow) {
+				EditorGUI.indentLevel = 0;
+				if (controller.allowGroups && controller.groups.Count > 0) {
+					EditorGUILayout.BeginHorizontal ();
+					EditorGUILayout.LabelField ("Allow trade with group", EditorStyles.boldLabel);
+					if (GUILayout.Button ("Select all", EditorStyles.miniButtonLeft)) {
+						Undo.RegisterUndo ((TradePost)target, "Select all groups");
+						for (int g = 0; g<post.groups.Count; g++)
+							post.groups [g] = true;
+					}
+					if (GUILayout.Button ("Select none", EditorStyles.miniButtonRight)) {
+						Undo.RegisterUndo ((TradePost)target, "Select no groups");
+						for (int g = 0; g<post.groups.Count; g++)
+							post.groups [g] = false;
+					}
+					EditorGUILayout.EndHorizontal ();
+					EditorGUI.indentLevel = 1;
+					
+					if (!controller.showHoriz) {
+						for (int a = 0; a<post.groups.Count; a = a+2) {
 							EditorGUILayout.BeginHorizontal ();
-							post.groups [g].allow = EditorGUILayout.Toggle ("Enable level " + (g + 1) + " groups", post.groups [g].allow);
-							if (post.groups [g].allow) {
-								post.groups [g].selection = EditorGUILayout.Popup ("Group " + (g + 1), post.groups [g].selection, controller.groups.ToArray (), "DropDownButton");
-								if (g == post.groups.Count - 1) {
-									post.groups.Add (new Group{allow = false, selection = 0});
-								}
-							}
+							post.groups [a] = EditorGUILayout.Toggle (controller.groups [a], post.groups [a]);
+							if (a < post.groups.Count - 1)
+								post.groups [a + 1] = EditorGUILayout.Toggle (controller.groups [a + 1], post.groups [a + 1]);
 							EditorGUILayout.EndHorizontal ();
-						} else {
-							post.groups.RemoveAt (g);
-							g--;
+						}
+					} else {
+						int half = Mathf.CeilToInt (post.groups.Count / 2f);
+				
+						for (int a = 0; a< half; a++) {
+							EditorGUILayout.BeginHorizontal ();
+							post.groups [a] = EditorGUILayout.Toggle (controller.groups [a], post.groups [a]);
+							if (half + a < post.groups.Count)	
+								post.groups [half + a] = EditorGUILayout.Toggle (controller.groups [half + a], post.groups [half + a]);
+							EditorGUILayout.EndHorizontal ();
 						}
 					}
+					
 				} else//else not enabled, show help box
 					EditorGUILayout.HelpBox ("There are no available options because grouping has not been enabled in the controller, or there are no possible groups", MessageType.Info);
 			}
 			EditorGUILayout.EndVertical ();
+			#endregion
+			#region factions
+			EditorGUI.indentLevel = 0;
+			EditorGUILayout.BeginVertical ("HelpBox");
+			controller.showPF = EditorGUILayout.Foldout (controller.showPF, "Factions");
+			if (controller.showPF) {
+				EditorGUI.indentLevel = 0;
+				if (controller.allowFactions && controller.factions.Count > 0) {
+					EditorGUILayout.BeginHorizontal ();
+					EditorGUILayout.LabelField ("Select factions", EditorStyles.boldLabel);
+					if (GUILayout.Button ("Select all", EditorStyles.miniButtonLeft)) {
+						Undo.RegisterUndo ((TradePost)target, "Select all factions");
+						for (int f = 0; f<post.factions.Count; f++)
+							post.factions [f] = true;
+					}
+					if (GUILayout.Button ("Select none", EditorStyles.miniButtonRight)) {
+						Undo.RegisterUndo ((TradePost)target, "Select no factions");
+						for (int f = 0; f<post.factions.Count; f++)
+							post.factions [f] = false;
+					}
+					EditorGUILayout.EndHorizontal ();
+					EditorGUI.indentLevel = 1;
+					
+					if (!controller.showHoriz) {
+						for (int a = 0; a<post.factions.Count; a = a+2) {
+							EditorGUILayout.BeginHorizontal ();
+							post.factions [a] = EditorGUILayout.Toggle (controller.factions [a].name, post.factions [a]);
+							if (a < post.factions.Count - 1)
+								post.factions [a + 1] = EditorGUILayout.Toggle (controller.factions [a + 1].name, post.factions [a + 1]);
+							EditorGUILayout.EndHorizontal ();
+						}
+					} else {
+						int half = Mathf.CeilToInt (post.factions.Count / 2f);
+				
+						for (int a = 0; a< half; a++) {
+							EditorGUILayout.BeginHorizontal ();
+							post.factions [a] = EditorGUILayout.Toggle (controller.factions [a].name, post.factions [a]);
+							if (half + a < post.factions.Count)	
+								post.factions [half + a] = EditorGUILayout.Toggle (controller.factions [half + a].name, post.factions [half + a]);
+							EditorGUILayout.EndHorizontal ();
+						}
+					}
+					
+				} else//else not enabled, show help box
+					EditorGUILayout.HelpBox ("There are no available options because factions have not been enabled in the controller, or there are no possible factions", MessageType.Info);
+			}
+			EditorGUILayout.EndVertical ();
+			#endregion
+			#region enable items
 			EditorGUI.indentLevel = 0;
 			EditorGUILayout.BeginVertical ("HelpBox");
 			controller.showPE = EditorGUILayout.Foldout (controller.showPE, "Enable items");
-			if (controller.showPE) {
-				EditorGUI.indentLevel = 1;
-				EditorGUILayout.BeginHorizontal ();
-				controller.showHoriz = EditorGUILayout.Toggle (new GUIContent ("Show items vertically", "When enabling or disabling " +
-			"items at trade posts and spawners, show ascending vertically"), controller.showHoriz, "Radio");
-				controller.showHoriz = !EditorGUILayout.Toggle (new GUIContent ("Show items horizontally", "When enabling or disabling " +
-			"items at trade posts and spawners, show ascending horizontally"), !controller.showHoriz, "Radio");
-				EditorGUILayout.EndHorizontal ();
+			if (controller.showPE) {				
 				EditorGUI.indentLevel = 0;
 				EditorGUILayout.BeginHorizontal ();
 				EditorGUILayout.LabelField ("Allow item at this post", EditorStyles.boldLabel);
 				if (GUILayout.Button ("Select all", EditorStyles.miniButtonLeft)) {
 					Undo.RegisterUndo ((TradePost)target, "Select all items");
-					for (int s = 0; s<post.stock.Count; s++) {
+					for (int s = 0; s<post.stock.Count; s++)
 						post.stock [s].allow = true;
-					}
 				}
 				if (GUILayout.Button ("Select none", EditorStyles.miniButtonRight)) {
 					Undo.RegisterUndo ((TradePost)target, "Select no items");
-					for (int s = 0; s<post.stock.Count; s++) {
+					for (int s = 0; s<post.stock.Count; s++) 
 						post.stock [s].allow = false;
-					}
 				}
 				EditorGUILayout.EndHorizontal ();
 				EditorGUI.indentLevel = 1;
@@ -101,6 +177,7 @@ public class PostEditor : Editor
 				}
 			}
 			EditorGUILayout.EndVertical ();
+			#endregion
 		}
 		#endregion
 		#region stock
@@ -149,6 +226,8 @@ public class PostEditor : Editor
 			}
 		}
 		#endregion
+		if (GUI.changed)
+			EditorUtility.SetDirty(post);
 	}
 	
 	bool Check (List<NeedMake> mnfctr)
@@ -158,5 +237,33 @@ public class PostEditor : Editor
 				return false;
 		}
 		return true;
+	}
+	
+	void OnSceneGUI ()
+	{
+		if (controller.showR && controller.showRP) {
+			for (int p1 = 0; p1<postScripts.Length; p1++) {
+				for (int p2 = p1 +1; p2<postScripts.Length; p2++) {
+					if (controller.CheckGroupsFactions (postScripts [p1], postScripts [p2])) {
+						if (!controller.allowFactions) {
+							Handles.color = Color.green;
+							Handles.DrawLine (posts [p1].transform.position, posts [p2].transform.position);
+						} else {
+							List<Color> colors = new List<Color> ();
+							for (int f = 0; f<controller.factions.Count; f++) {
+								if (postScripts [p1].factions [f] && postScripts [p2].factions [f])
+									colors.Add (controller.factions [f].color);
+							}
+							for (int c = 0; c<colors.Count; c++) {
+								Handles.color = colors [c];
+								//set the line color and split the distance up so that can be multi colored
+								Handles.DrawLine (((posts [p2].transform.position - posts [p1].transform.position) / colors.Count) * c + posts [p1].transform.position,
+									((posts [p2].transform.position - posts [p1].transform.position) / colors.Count) * (c + 1) + posts [p1].transform.position);
+							}//end for colors
+						}//end else factions enabled
+					}//end check
+				}//end 2nd post
+			}//end 1st post
+		}//end show routes
 	}
 }

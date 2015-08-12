@@ -1,7 +1,6 @@
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using System;
 
 [System.Serializable]
@@ -20,38 +19,18 @@ public class Mnfctr
 	public int seconds;
 }
 
-[System.Serializable]
-public class Group
-{
-	public bool allow;
-	public int selection;
-	
-	public bool Equals (Group other)
-	{
-		if (System.Object.ReferenceEquals (other, null))
-			return false;
-		if (System.Object.ReferenceEquals (this, other))
-			return true;
-		return 	allow.Equals (other.allow) &&
-				selection.Equals (other.selection);
-	}
-	
-	public override int GetHashCode ()
-	{
-		int hashAllow = allow.GetHashCode ();
-		int hashSelection = selection == -1 ? 0 : selection.GetHashCode ();
-		
-		return hashAllow ^ hashSelection;
-	}
-}
-
 public class TradePost : MonoBehaviour
 {
 	public List<Stock> stock = new List<Stock> ();
 	public List<Mnfctr> manufacture = new List<Mnfctr> ();
 	Controller controller;
 	float[] times;
-	public List<Group> groups = new List<Group>();
+	public List<bool> groups = new List<bool> ();
+	public List<bool> factions = new List<bool> ();
+	string text1 = "Please ensure that the ";
+	string text2 = " sent to the new trade post is the correct length.\nIt needs to have a value for each ";
+	string text3 = " is greater than the number of ";
+	string text4 = " available or less than 0.\nMake sure that the ";
 	
 	void Start ()
 	{
@@ -66,29 +45,31 @@ public class TradePost : MonoBehaviour
 	{				
 		for (int x = 0; x<stock.Count; x++) {
 			if (stock [x].number == 0)
-				stock [x].price = controller.goodsArray  [x].maxPrice;
+				stock [x].price = controller.goodsArray [x].maxPrice;
 			else {				
-				stock [x].price = Mathf.Clamp ((int)(controller.goodsArray  [x].basePrice * 
-				((float)controller.goodsArray  [x].average / stock [x].number)), 
-				controller.goodsArray  [x].minPrice, controller.goodsArray  [x].maxPrice);
+				stock [x].price = Mathf.Clamp ((int)(controller.goodsArray [x].basePrice * 
+				((float)controller.goodsArray [x].average / stock [x].number)), 
+				controller.goodsArray [x].minPrice, controller.goodsArray [x].maxPrice);
 			}
 		}
 	}
 	
-	public void NewPost (int[] itemNumbers, int[] manufactureTimes)
+	public void NewPost (int[] itemNumbers, int[] manufactureTimes, bool[] groupsAllow, bool[] factionsAllow)
 	{//only used if it is a new trading post
 		Start ();
 		if (itemNumbers.Length != controller.goodsArray.Length)
-			Debug.LogError ("Please ensure that the item numbers sent to the new trade post is the correct length\nIt needs to have a value for each item. set as -1 to disable an item.");
-		for (int g = 0; g<controller.goodsArray.Length; g++) {
-			if (itemNumbers [g] >= 0) {
-				stock.Add (new Stock{name = controller.goodsArray [g].name, number = itemNumbers [g], allow = true});
-				controller.UpdateAverage (g, itemNumbers [g], 1);
-			} else
-				stock.Add (new Stock{name = controller.goodsArray [g].name, number = 0, allow = false});
+			Debug.LogError (text1 + "item numbers" + text2 + "item. Set to -1 to disable an item.");
+		else {
+			for (int g = 0; g<controller.goodsArray.Length; g++) {
+				if (itemNumbers [g] >= 0) {
+					stock.Add (new Stock{name = controller.goodsArray [g].name, number = itemNumbers [g], allow = true});
+					controller.UpdateAverage (g, itemNumbers [g], 1);
+				} else
+					stock.Add (new Stock{name = controller.goodsArray [g].name, number = 0, allow = false});
+			}
 		}
 		if (manufactureTimes.Length != controller.manufacturing.Count)
-			Debug.LogError ("Please ensure that the manufacture times sent to the new trade post is the correct length\nIt needs to have a value for each manufacturing process");
+			Debug.LogError (text1 + "manufacture times" + text2 + "manufacturing process. Set to less than 1 to disable a process.");
 		else {
 			for (int m = 0; m<manufactureTimes.Length; m++) {   
 				if (manufactureTimes [m] > 0)
@@ -96,6 +77,18 @@ public class TradePost : MonoBehaviour
 				else
 					manufacture.Add (new Mnfctr{allow = false, seconds = 1});
 			}
+		}
+		if (groupsAllow.Length != controller.groups.Count)
+			Debug.LogError (text1 + "groups bool array" + text2 + "group.");
+		else {
+			for (int g = 0; g<groupsAllow.Length; g++)
+				groups.Add (groupsAllow [g]);
+		}
+		if (factionsAllow.Length != controller.factions.Count)
+			Debug.LogError (text1 + "factions bool array" + text2 + "faction.");
+		else {
+			for (int f = 0; f<factionsAllow.Length; f++)
+				factions.Add (factionsAllow [f]);
 		}
 		controller.posts.Add (gameObject);
 		controller.postScripts.Add (this);
@@ -110,7 +103,7 @@ public class TradePost : MonoBehaviour
 				
 				AddRemove (controller.manufacturing [t].needing, true);
 				AddRemove (controller.manufacturing [t].making, false);
-				UpdatePrice();
+				UpdatePrice ();
 			}
 		}	
 	}
@@ -152,7 +145,7 @@ public class TradePost : MonoBehaviour
 			controller.posts.Add (this.gameObject);
 		else {
 			mult = -1;
-			controller.posts.Remove(this.gameObject);
+			controller.posts.Remove (this.gameObject);
 		}
 		
 		for (int s = 0; s<stock.Count; s++) {
@@ -163,8 +156,8 @@ public class TradePost : MonoBehaviour
 	
 	public void ItemEnableDisable (bool enable, int productID)
 	{
-		if (productID > stock.Count - 1) 
-			Debug.LogError ("The productID is greater than the number of items available.\nMake sure that the productID is correct.");
+		if (productID > stock.Count - 1 || productID < 0) 
+			Debug.LogError ("The productID"+text3+"items"+text4+"productID is correct.");
 		else {
 			if (stock [productID].allow != enable) {
 				if (enable) 
@@ -178,8 +171,8 @@ public class TradePost : MonoBehaviour
 	
 	public void ManufactureEnableDisable (bool enable, int manufactureID, int time)
 	{
-		if (manufactureID > controller.manufacturing.Count - 1)
-			Debug.LogError ("The manufactureID is greater than the number of manufactureing processes set up.\nMake sure that the manufactureID is correct.");
+		if (manufactureID > controller.manufacturing.Count - 1 || manufactureID < 0)
+			Debug.LogError ("The manufactureID"+text3+"manufactureing processes"+text4+"manufactureID is correct.");
 		else {		
 			manufacture [manufactureID].allow = enable;
 			manufacture [manufactureID].seconds = time;

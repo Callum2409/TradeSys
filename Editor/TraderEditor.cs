@@ -20,6 +20,7 @@ public class TraderEditor : Editor {
 	public override void OnInspectorGUI ()
 	{
 		EditorGUI.indentLevel = 0;
+		if (trader.gameObject.activeInHierarchy) {
 		EditorGUILayout.BeginHorizontal ();
 		trader.target = (GameObject)EditorGUILayout.ObjectField (new GUIContent ("Target post", "This is the post that the trader starts at. This will change when playing to the post that the trader is going to."), trader.target, typeof(GameObject), true);
 		
@@ -56,7 +57,8 @@ public class TraderEditor : Editor {
 			EditorGUILayout.HelpBox ("The target post selected is not a trade post or has been " +
 				"incorrectly set up.\nMake sure that the target post has the TradePost script attached and the " +
 				"tag set to Trade Post.", MessageType.Error);
-		
+	}//end if in hierarchy
+
 		EditorGUILayout.BeginHorizontal ();
 		trader.stopTime = EditorGUILayout.FloatField (new GUIContent ("Stop time", "This is the time that the trader will stop for before leaving a trade post"), trader.stopTime);
 		
@@ -88,5 +90,71 @@ public class TraderEditor : Editor {
 		trader.cargoSpace = Mathf.Max (trader.cargoSpace, 0.000001f);
 		trader.radarDistance = Mathf.Max (trader.radarDistance, 0);
 		trader.droneTime = Mathf.Max (trader.droneTime, 0);
+		
+		#region factions
+		EditorGUI.indentLevel = 0;
+		EditorGUILayout.BeginVertical ("HelpBox");
+		controller.showTF = EditorGUILayout.Foldout (controller.showTF, "Factions");
+		if (controller.showTF) {
+			EditorGUILayout.BeginHorizontal ();
+			controller.showHoriz = EditorGUILayout.Toggle (new GUIContent ("Show items vertically", "This will show the items ascending vertically"), controller.showHoriz, "Radio");
+			controller.showHoriz = !EditorGUILayout.Toggle (new GUIContent ("Show items horizontally", "This will show the items ascending h"), !controller.showHoriz, "Radio");
+			EditorGUILayout.EndHorizontal ();
+			
+			EditorGUI.indentLevel = 0;
+			if (controller.allowFactions && controller.factions.Count > 0) {
+				EditorGUILayout.BeginHorizontal ();
+				EditorGUILayout.LabelField ("Select factions", EditorStyles.boldLabel);
+				if (GUILayout.Button ("Select all", EditorStyles.miniButtonLeft)) {
+					Undo.RegisterUndo ((Trader)target, "Select all factions");
+					for (int f = 0; f<trader.factions.Count; f++)
+						trader.factions [f] = true;
+				}
+				if (GUILayout.Button ("Select none", EditorStyles.miniButtonRight)) {
+					Undo.RegisterUndo ((Trader)target, "Select no factions");
+					for (int f = 0; f<trader.factions.Count; f++)
+						trader.factions [f] = false;
+				}
+				EditorGUILayout.EndHorizontal ();
+				EditorGUI.indentLevel = 1;
+					
+				if (!controller.showHoriz) {
+					for (int a = 0; a<trader.factions.Count; a = a+2) {
+						EditorGUILayout.BeginHorizontal ();
+						trader.factions [a] = EditorGUILayout.Toggle (controller.factions [a].name, trader.factions [a]);
+						if (a < trader.factions.Count - 1)
+							trader.factions [a + 1] = EditorGUILayout.Toggle (controller.factions [a + 1].name, trader.factions [a + 1]);
+						EditorGUILayout.EndHorizontal ();
+					}
+				} else {
+					int half = Mathf.CeilToInt (trader.factions.Count / 2f);
+				
+					for (int a = 0; a< half; a++) {
+						EditorGUILayout.BeginHorizontal ();
+						trader.factions [a] = EditorGUILayout.Toggle (controller.factions [a].name, trader.factions [a]);
+						if (half + a < trader.factions.Count)	
+							trader.factions [half + a] = EditorGUILayout.Toggle (controller.factions [half + a].name, trader.factions [half + a]);
+						EditorGUILayout.EndHorizontal ();
+					}
+				}
+					
+			} else//else not enabled, show help box
+				EditorGUILayout.HelpBox ("There are no available options because factions have not been enabled in the controller, or there are no possible factions", MessageType.Info);
+		}
+		EditorGUILayout.EndVertical ();
+		#endregion
+		if (!Application.isPlaying && trader.gameObject.activeInHierarchy && controller.allowFactions && !CheckFaction () && controller.factions.Count > 0) {
+			EditorGUI.indentLevel = 0;
+			EditorGUILayout.HelpBox ("The target post and trader are not in the same faction.\nMake sure they are in the same faction so that the trader can make trades.", MessageType.Error);
+		}
+	}
+	
+	bool CheckFaction ()
+	{//checking that post is not of same faction
+		for (int f = 0; f<trader.factions.Count; f++) {
+			if (trader.factions [f] && trader.target.GetComponent<TradePost> ().factions [f])
+				return true;
+		}	
+		return false;
 	}
 }

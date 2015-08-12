@@ -2,7 +2,6 @@ using UnityEngine;
 using UnityEditor;
 using System.Collections.Generic;
 using System;
-using System.IO;
 
 [CustomEditor(typeof(Controller))]
 public class ControllerEditor : Editor
@@ -12,13 +11,26 @@ public class ControllerEditor : Editor
 	TradePost[] postScripts;
 	GameObject[] spawners;
 	string[] directories;
+	List<GameObject> traders = new List<GameObject>();
+	Trader[] traderScripts;
 	
 	void Awake ()
 	{
 		posts = GameObject.FindGameObjectsWithTag ("Trade Post");
 		postScripts = new TradePost[posts.Length];
 		spawners = GameObject.FindGameObjectsWithTag ("Spawner");
+		traders = new List<GameObject>(GameObject.FindGameObjectsWithTag ("Trader"));
 		controller = (Controller)target;
+		directories = AssetDatabase.GetAllAssetPaths ();//get all assets so item crate finder works
+		
+		for (int d = 0; d<directories.Length; d++) {
+			GameObject asset = (GameObject)AssetDatabase.LoadAssetAtPath (directories [d], typeof(GameObject));
+			if (asset != null && asset.tag == "Trader") {
+				traders.Add(asset);
+			} 
+		}
+		
+		traderScripts = new Trader[traders.Count];
 		
 		while (controller.showSmallG.Count != controller.goods.Count) {
 			if (controller.showSmallG.Count > controller.goods.Count) {
@@ -42,11 +54,22 @@ public class ControllerEditor : Editor
 				} else {
 					post.stock.Add (new Stock{name = "Name", allow = true});
 				}
-			}//end while not enough items in posts
-			CheckManufacturingLists(p);
-			while (post.groups.Count < 2) 
-				post.groups.Add (new Group{allow = false, selection = 0});
-			post.groups [0].allow = true;
+			}//end while not correct number of items in posts
+			CheckManufacturingLists (p);
+			while (post.groups.Count != controller.groups.Count) {
+				if (post.groups.Count > controller.groups.Count) {
+					post.groups.RemoveAt (post.groups.Count - 1);
+				} else {
+					post.groups.Add (false);
+				}
+			}//while not correct number of groups
+			while (post.factions.Count != controller.factions.Count) {
+				if (post.factions.Count > controller.factions.Count) {
+					post.factions.RemoveAt (post.factions.Count - 1);
+				} else {
+					post.factions.Add (false);
+				}
+			}//while not correct number of factions
 		}//end for posts
 		for (int s = 0; s<spawners.Length; s++) {
 			Spawner spawner = spawners [s].GetComponent<Spawner> ();
@@ -56,9 +79,18 @@ public class ControllerEditor : Editor
 				} else {
 					spawner.allowSpawn.Add (true);
 				}
-			}//end while not enough items in spawner
+			}//end while not correct number of items in spawner
 		}//end for spawners
-		directories = AssetDatabase.GetAllAssetPaths ();//get all assets so item crate finder works
+		for (int t = 0; t<traders.Count; t++) {
+			Trader trader = traderScripts [t] = traders [t].GetComponent<Trader> ();
+			while (trader.factions.Count != controller.factions.Count) {
+				if (trader.factions.Count > controller.factions.Count) {
+					trader.factions.RemoveAt (trader.factions.Count - 1);
+				} else {
+					trader.factions.Add (false);
+				}
+			}
+		}
 	}
 	
 	public override void OnInspectorGUI ()
@@ -82,10 +114,11 @@ public class ControllerEditor : Editor
 			
 			#region show trade routes
 			EditorGUI.indentLevel = 0;
-			bool before = controller.showR;
+			EditorGUILayout.BeginHorizontal ();
 			controller.showR = EditorGUILayout.Toggle ("Show trade routes", controller.showR);
-			if (controller.showR != before)
-				controller.transform.Translate (Vector3.zero);
+			if (controller.showR)
+				controller.showRP = EditorGUILayout.Toggle (new GUIContent ("Show routes on post", "Show trade routes while editing trade posts"), controller.showRP);
+			EditorGUILayout.EndHorizontal ();
 			#endregion
 			
 			#region expendable traders
@@ -145,10 +178,7 @@ public class ControllerEditor : Editor
 			if (controller.allowGroups)
 				EditorGUILayout.BeginVertical ("HelpBox");
 			EditorGUI.indentLevel = 0;
-			bool allowGroupsChnage = controller.allowGroups;
 			controller.allowGroups = EditorGUILayout.Toggle (new GUIContent ("Enable Groups", "Groups can be used to allow trading between select trade posts"), controller.allowGroups);
-			if (controller.allowGroups != allowGroupsChnage && controller.showR)
-				controller.transform.Translate (Vector3.zero);	
 			if (controller.allowGroups) {
 				EditorGUILayout.BeginHorizontal ();
 				EditorGUILayout.LabelField ("Number of groups:", "" + controller.groups.Count);
@@ -156,6 +186,8 @@ public class ControllerEditor : Editor
 					Undo.RegisterUndo ((Controller)target, "Add new group");
 					controller.groups.Add ("Group " + controller.groups.Count);
 					controller.showG = true;
+					for (int p = 0; p<postScripts.Length; p++)
+						postScripts [p].groups.Add (false);
 				}
 				EditorGUILayout.EndHorizontal ();
 				controller.showG = EditorGUILayout.Foldout (controller.showG, "Groups");
@@ -172,12 +204,7 @@ public class ControllerEditor : Editor
 							if (GUILayout.Button ("", "OL Minus")) {
 								Undo.RegisterUndo ((Controller)target, "Delete group");
 								for (int p = 0; p<postScripts.Length; p++) {
-									for (int e = 0; e<postScripts[p].groups.Count; e++) {
-										if (postScripts [p].groups [e].selection == g)
-											postScripts [p].groups [e].selection = -1;
-										if (postScripts [p].groups [e].selection > g) 
-											postScripts [p].groups [e].selection -= 1;
-									}
+									postScripts [p].groups.RemoveAt (g);
 								}
 								controller.groups.RemoveAt (g);
 							}
@@ -191,19 +218,74 @@ public class ControllerEditor : Editor
 			if (controller.allowGroups)
 				GUILayout.EndVertical ();
 			#endregion
+			#region factions
+			EditorGUI.indentLevel = 0;
+			if (controller.allowFactions)
+				EditorGUILayout.BeginVertical ("HelpBox");
+			EditorGUI.indentLevel = 0;
+			controller.allowFactions = EditorGUILayout.Toggle (new GUIContent ("Enable Factions", "Factions are used to allow trading between posts, and with only specific traders"), controller.allowFactions);
+			if (controller.allowFactions) {
+				EditorGUILayout.BeginHorizontal ();
+				EditorGUILayout.LabelField ("Number of factions:", "" + controller.factions.Count);
+				if (GUILayout.Button ("Add", EditorStyles.miniButton)) {
+					Undo.RegisterUndo ((Controller)target, "Add new faction");
+					controller.factions.Add (new Faction{name = "Faction " + controller.factions.Count, color = Color.green});
+					controller.showF = true;
+					for (int p = 0; p<postScripts.Length; p++)
+						postScripts [p].factions.Add (false);
+					for (int t = 0; t<traderScripts.Length; t++)
+						traderScripts [t].factions.Add (false);
+				}
+				EditorGUILayout.EndHorizontal ();
+				controller.showF = EditorGUILayout.Foldout (controller.showF, "Factions");
+				if (controller.showF) {
+					if (controller.factions.Count > 0) {
+						EditorGUILayout.BeginVertical ("HelpBox");
+						for (int f = 0; f<controller.factions.Count; f++) {
+							EditorGUILayout.BeginHorizontal ();
+							if (controller.factions [f].name == "")
+								controller.factions [f].name = "Element " + controller.factions.Count;
+							controller.factions [f].name = EditorGUILayout.TextField (controller.factions [f].name, controller.factions [f].name);
+							EditorGUILayout.BeginVertical (GUILayout.MaxWidth (80f));
+							GUILayout.Space (3f);
+							controller.factions [f].color = EditorGUILayout.ColorField (controller.factions [f].color, GUILayout.MaxWidth (80f));
+							EditorGUILayout.EndVertical ();
+							EditorGUILayout.BeginVertical (GUILayout.MaxWidth (18f));
+							GUILayout.Space (3f);
+							if (GUILayout.Button ("", "OL Minus")) {
+								Undo.RegisterUndo ((Controller)target, "Delete faction");
+								for (int p = 0; p<postScripts.Length; p++) 
+									postScripts [p].factions.RemoveAt (f);
+								for (int t = 0; t<traderScripts.Length; t++)
+									traderScripts [t].factions.RemoveAt (f);
+								controller.factions.RemoveAt (f);
+							}
+							EditorGUILayout.EndVertical ();
+							EditorGUILayout.EndHorizontal ();
+						}
+						EditorGUILayout.EndVertical ();
+					}
+				}	
+			}
+			if (controller.allowFactions)
+				GUILayout.EndVertical ();
+			#endregion
 			#region units
 			EditorGUI.indentLevel = 0;
+			GUILayout.BeginVertical ("HelpBox");
+			EditorGUILayout.BeginHorizontal ();
+			EditorGUILayout.LabelField ("Number of units: ", "" + controller.units.Count);
+			if (GUILayout.Button ("Add", EditorStyles.miniButton)) {
+				Undo.RegisterUndo ((Controller)target, "Add new unit");
+				controller.units.Add (new Unit{suffix = "New unit", max = Mathf.Infinity, min = 0.000001f});
+				controller.showAU = true;
+			}
+			EditorGUILayout.EndHorizontal ();
 			controller.showAU = EditorGUILayout.Foldout (controller.showAU, "Units");
 			if (controller.showAU) {
-				if (controller.units.Count > 0)
-					GUILayout.BeginVertical ("HelpBox");
-				if (GUILayout.Button ("Add", EditorStyles.miniButton)) {
-					Undo.RegisterUndo ((Controller)target, "Add new unit");
-					controller.units.Add (new Unit{suffix = "New unit", max = Mathf.Infinity, min = 0.000001f});
-				}
 				for (int u = 0; u<controller.units.Count; u++) {
 					Unit cur = controller.units [u];
-					EditorGUI.indentLevel = 0;
+					EditorGUI.indentLevel = 1;
 					
 					EditorGUILayout.BeginHorizontal ();
 					cur.suffix = EditorGUILayout.TextField ("Unit suffix", cur.suffix);
@@ -216,7 +298,7 @@ public class ControllerEditor : Editor
 					EditorGUILayout.EndVertical ();
 					EditorGUILayout.EndHorizontal ();
 					
-					EditorGUI.indentLevel = 1;
+					EditorGUI.indentLevel = 2;
 					EditorGUILayout.BeginHorizontal ();
 					cur.min = EditorGUILayout.FloatField ("Min", cur.min);
 					cur.max = EditorGUILayout.FloatField ("Max", cur.max);
@@ -237,9 +319,9 @@ public class ControllerEditor : Editor
 				if (!CheckInfinity () && controller.units.Count > 0)
 					EditorGUILayout.HelpBox ("None of your units extend to ininity. As a result, some items may not have " +
 						"any units. To extend to infinity, type infinity into the max field.", MessageType.Warning);
-				if (controller.units.Count > 0)
-					GUILayout.EndVertical ();
 			}
+			GUILayout.EndVertical ();
+			
 		#endregion
 		}
 		#endregion
@@ -356,7 +438,7 @@ public class ControllerEditor : Editor
 				
 			}//end for all
 			if (controller.goods.Count == 0) {
-				if (GUILayout.Button ("Add")) {
+				if (GUILayout.Button ("Add", EditorStyles.miniButton)) {
 					Undo.RegisterUndo ((Controller)target, "Add new good");
 					controller.showSmallG.Add (true);
 					controller.goods.Add (new Goods{name = "Name", basePrice = 0, minPrice = 0, maxPrice = 0, mass = 1});
@@ -536,10 +618,9 @@ public class ControllerEditor : Editor
 				} else {
 					int[] count = new int[controller.groups.Count];
 					for (int p = 0; p<postScripts.Length; p++) {
-						for (int g = 0; g<postScripts[p].groups.Count; g++) {
-							if (postScripts [p].groups [g].allow && postScripts [p].groups [g].selection != -1)
-								count [postScripts [p].groups [g].selection]++;
-						}
+						for (int g  = 0; g<controller.groups.Count; g++)
+							if (postScripts [p].groups [g])
+								count [g]++;	
 					}
 					EditorGUI.indentLevel = 0;
 					EditorGUILayout.BeginVertical ("HelpBox");
@@ -563,29 +644,79 @@ public class ControllerEditor : Editor
 							EditorGUILayout.EndHorizontal ();
 						}
 					}
-					int totalLinks = 0;
-					for (int p1 = 0; p1<postScripts.Length; p1++) {
-						for (int p2 = p1 +1; p2<postScripts.Length; p2++) {
-							if (controller.CheckGroups (postScripts [p1], postScripts [p2])) {
-								totalLinks++;
-							}
-						}
-					}
-					EditorGUI.indentLevel = 0;
-					EditorGUILayout.LabelField (new GUIContent ("Total number of links", "This is the total number of  unique trade links (Does not include links going in the opposite direction to that already counted)"), 
-						new GUIContent ("" + totalLinks, "This is the total number of  unique trade links (Does not include links going in the opposite direction to that already counted)"));
 					EditorGUILayout.EndVertical ();
 				}//groups have been enabled
 			}
 			#endregion
+			#region factions
+			{
+				if (!controller.allowFactions) {
+					EditorGUI.indentLevel = 0;
+					EditorGUILayout.BeginVertical ("HelpBox");
+					EditorGUILayout.LabelField ("Factions", EditorStyles.boldLabel);
+					EditorGUI.indentLevel = 1;
+					EditorGUILayout.HelpBox ("Factions have not been enabled, so all posts and traders can trade with each other", MessageType.Info);
+					EditorGUILayout.EndVertical ();
+				} else {
+					int[] countP = new int[controller.factions.Count];
+					int[] countT = new int[controller.factions.Count];
+					for (int p = 0; p<postScripts.Length; p++) {
+						for (int f  = 0; f<controller.factions.Count; f++)
+							if (postScripts [p].factions [f])
+								countP [f]++;	
+					}
+					GameObject[] tradersInScene = GameObject.FindGameObjectsWithTag ("Trader");
+					for (int t = 0; t<tradersInScene.Length; t++) {
+						for (int f  = 0; f<controller.factions.Count; f++)
+							if (tradersInScene [t].GetComponent<Trader> ().factions [f])
+								countT [f]++;	
+					}
+					EditorGUI.indentLevel = 0;
+					EditorGUILayout.BeginVertical ("HelpBox");
+					EditorGUILayout.LabelField ("Factions", EditorStyles.boldLabel);
+					EditorGUI.indentLevel = 1;
+					string text = "Left number is number of posts in the faction. Right number is the number of traders in the faction";
+					if (!controller.showHoriz) {
+						for (int f = 0; f<controller.factions.Count; f=f+2) {
+							EditorGUILayout.BeginHorizontal ();
+							EditorGUILayout.LabelField (new GUIContent (controller.factions [f].name), new GUIContent ("" + countP [f] + ", " + countT [f], text));
+							if (f < controller.factions.Count - 1)
+								EditorGUILayout.LabelField (new GUIContent (controller.factions [f + 1].name), new GUIContent ("" + countP [f + 1] + ", " + countT [f], text));
+							EditorGUILayout.EndHorizontal ();
+						}
+					} else {
+						int half = Mathf.CeilToInt (controller.factions.Count / 2f);
+						for (int f = 0; f<half; f++) {
+							EditorGUILayout.BeginHorizontal ();
+							EditorGUILayout.LabelField (new GUIContent (controller.factions [f].name), new GUIContent ("" + countP [f] + ", " + countT [f], text));
+							if (half + f < controller.factions.Count)
+								EditorGUILayout.LabelField (new GUIContent (controller.factions [half + f].name), new GUIContent ("" + countP [half + f] + ", " + countT [half + f], text));
+							EditorGUILayout.EndHorizontal ();
+						}
+					}
+					EditorGUILayout.EndVertical ();
+				}//groups have been enabled
+			}
+			#endregion
+			int totalLinks = 0;
+			for (int p1 = 0; p1<postScripts.Length; p1++) {
+				for (int p2 = p1 +1; p2<postScripts.Length; p2++) {
+					if (controller.CheckGroupsFactions (postScripts [p1], postScripts [p2])) {
+						totalLinks++;
+					}
+				}
+			}
+			EditorGUI.indentLevel = 0;
+			EditorGUILayout.LabelField (new GUIContent ("Total number of links", "This is the total number of  unique trade links (Does not include links going in the opposite direction to that already counted)"), 
+						new GUIContent ("" + totalLinks, "This is the total number of  unique trade links (Does not include links going in the opposite direction to that already counted)"));
+					
 			#region item totals
 			{
 				EditorGUI.indentLevel = 0;
 				EditorGUILayout.BeginVertical ("HelpBox");
 				EditorGUILayout.LabelField ("Item totals", EditorStyles.boldLabel);
 				EditorGUI.indentLevel = 1;
-				string text1 = "The number in brackets next to the item name is the number of posts it is available at.";
-				string text2 = "This is the number of the item available in the game";
+				string text = "Left number is the number of posts the item is available at. Right number is the total number of the item.";
 				int[] total = new int[controller.goods.Count];
 				int[] count = new int[controller.goods.Count];
 				for (int g = 0; g<controller.goods.Count; g++) {
@@ -604,18 +735,18 @@ public class ControllerEditor : Editor
 				if (!controller.showHoriz) {
 					for (int g = 0; g<controller.goods.Count; g=g+2) {
 						EditorGUILayout.BeginHorizontal ();
-						EditorGUILayout.LabelField (new GUIContent (controller.goods [g].name + " (" + count [g] + ")", text1), new GUIContent ("" + total [g], text2));
+						EditorGUILayout.LabelField (new GUIContent (controller.goods [g].name, ""), new GUIContent ("" + count [g] + ", " + total [g], text));
 						if (g < controller.goods.Count - 1)
-							EditorGUILayout.LabelField (new GUIContent (controller.goods [g + 1].name + " (" + count [g + 1] + ")", text1), new GUIContent ("" + total [g + 1], text2));
+							EditorGUILayout.LabelField (new GUIContent (controller.goods [g + 1].name, ""), new GUIContent ("" + count [g + 1] + ", " + total [g + 1], text));
 						EditorGUILayout.EndHorizontal ();
 					}
 				} else {
 					int half = Mathf.CeilToInt (controller.goods.Count / 2f);
 					for (int g = 0; g<half; g++) {
 						EditorGUILayout.BeginHorizontal ();
-						EditorGUILayout.LabelField (new GUIContent (controller.goods [g].name + " (" + count [g] + ")", text1), new GUIContent ("" + total [g], text2));
+						EditorGUILayout.LabelField (new GUIContent (controller.goods [g].name, ""), new GUIContent ("" + count [g] + ", " + total [g], text));
 						if (half + g < controller.goods.Count)
-							EditorGUILayout.LabelField (new GUIContent (controller.goods [half + g].name + " (" + count [half + g] + ")", text1), new GUIContent ("" + total [half + g], text2));
+							EditorGUILayout.LabelField (new GUIContent (controller.goods [half + g].name, ""), new GUIContent ("" + count [half + g] + ", " + total [half + g], text));
 						EditorGUILayout.EndHorizontal ();
 					}
 				}
@@ -679,6 +810,7 @@ public class ControllerEditor : Editor
 			
 			if (!controller.allowPickup && GameObject.FindGameObjectsWithTag ("Spawner").Length > 0)
 				controller.allowPickup = true;
+			EditorUtility.SetDirty (controller);
 		}//end if GUI changed
 		#endregion	
 	}
@@ -690,7 +822,7 @@ public class ControllerEditor : Editor
 				post.manufacture.RemoveAt (post.manufacture.Count - 1);
 			else
 				post.manufacture.Add (new Mnfctr{allow = false, seconds = 1});
-		}//end while not enough manufacturing
+		}//end while not correct number of manufacturing
 	}
 
 	void ChangeFromPoint (int point, bool increase)
@@ -798,12 +930,26 @@ public class ControllerEditor : Editor
 		if (controller.showR) {
 			for (int p1 = 0; p1<postScripts.Length; p1++) {
 				for (int p2 = p1 +1; p2<postScripts.Length; p2++) {
-					if (controller.CheckGroups (postScripts [p1], postScripts [p2])) {
-						Handles.color = Color.green;
-						Handles.DrawLine (posts [p1].transform.position, posts [p2].transform.position);
-					}
-				}
-			}
-		}
+					if (controller.CheckGroupsFactions (postScripts [p1], postScripts [p2])) {
+						if (!controller.allowFactions) {
+							Handles.color = Color.green;
+							Handles.DrawLine (posts [p1].transform.position, posts [p2].transform.position);
+						} else {
+							List<Color> colors = new List<Color> ();
+							for (int f = 0; f<controller.factions.Count; f++) {
+								if (postScripts [p1].factions [f] && postScripts [p2].factions [f])
+									colors.Add (controller.factions [f].color);
+							}
+							for (int c = 0; c<colors.Count; c++) {
+								Handles.color = colors [c];
+								//set the line color and split the distance up so that can be multi colored
+								Handles.DrawLine (((posts [p2].transform.position - posts [p1].transform.position) / colors.Count) * c + posts [p1].transform.position,
+									((posts [p2].transform.position - posts [p1].transform.position) / colors.Count) * (c + 1) + posts [p1].transform.position);
+							}//end for colors
+						}//end else factions enabled
+					}//end check
+				}//end 2nd post
+			}//end 1st post
+		}//end show routes
 	}
 }

@@ -12,18 +12,19 @@ public class NoType
 public class Trader : MonoBehaviour
 {
 	public GameObject target;//this is what the trader is heading for, trade post or dropped item
-internal GameObject finalPost;//need to temporarily move the target post here while collects dropped items
+	internal GameObject finalPost;//need to temporarily move the target post here while collects dropped items
 	internal List<NoType> trading = new List<NoType> ();//the manifest of the cargo carried
-internal bool onCall = false;//this is used to tell if the trader has been told to go somewhere
+	internal bool onCall = false;//this is used to tell if the trader has been told to go somewhere
 	public float stopTime = 2.0f;//the time required for the trader to stop at a trade post
 	public float cargoSpace = 1;//the cargo space of the trader
-internal float spaceRemaining;//the space remaining
-internal bool allowGo = false;//this is used if the trader is allowed to go as it has waited long enough
+	internal float spaceRemaining;//the space remaining
+	internal bool allowGo = false;//this is used if the trader is allowed to go as it has waited long enough
 	public float radarDistance = 10f;//this is used so that any items within this distance may be collected if it has been enabled
 	Controller controller;
 	internal Collider[] itemsInRadar;
 	public float droneTime = 1.0f;
 	public bool allowTraderPickup = false;
+	public List<bool> factions = new List<bool>();
 	
 	void Awake ()
 	{
@@ -33,15 +34,21 @@ internal bool allowGo = false;//this is used if the trader is allowed to go as i
 		spaceRemaining = cargoSpace;
 	}
 	
-	public void NewTrader (GameObject post, float space, float stop)
+	public void NewTrader (GameObject post, float space, float stop, bool[] factionsAllow)
 	{//only called if the trader is created in-game
 		this.gameObject.tag = "Trader";
 		target = post;
 		Awake ();
 		controller.traders.Add (gameObject);
-		controller.traderScripts.Add(this);
+		controller.traderScripts.Add (this);
 		cargoSpace = space;
 		stopTime = stop;
+		if (factionsAllow.Length != controller.factions.Count)
+			Debug.LogError ("Please ensure that the factions bool array sent to the new trade post is the correct length." +
+				"\nIt needs to have a value for each faction");
+		else
+			for (int f = 0; f<factionsAllow.Length; f++)
+				factions.Add(factionsAllow[f]);
 	}
 	
 	void FixedUpdate ()

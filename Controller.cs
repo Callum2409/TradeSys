@@ -95,10 +95,17 @@ public class Spawned
 	public int goodID;
 }
 
+[System.Serializable]
+public class Faction
+{
+	public string name;
+	public Color color;
+}
+
 public class Controller : MonoBehaviour
 {
 	#region initialize
-	public bool pauseBeforeStart, expendable, allowPickup, allowGroups;//USED IN GAME
+	public bool pauseBeforeStart, expendable, allowPickup, allowGroups, allowFactions;//USED IN GAME
 	public int maxNoTraders = 100;
 	GameObject allTraders;
 	public List<GameObject> expendableT = new List<GameObject> ();
@@ -118,12 +125,13 @@ public class Controller : MonoBehaviour
 	public List<bool> showSmallG = new List<bool> ();
 	public List<bool> showSmallM = new List<bool> ();
 	public List<string> allNames;
-	public List<Unit> units;
-	public bool showE, showP, showAU, showHoriz, showG, showR, showPG, showPE;//USED FOR EDITOR
+	public List<Unit> units = new List<Unit>();
+	public bool showE, showP, showAU, showHoriz, showG, showF, showR, showRP, showPG, showPF, showPE, showTF;//USED FOR EDITOR
 	public int  selC, selP;//USED IN EDITOR
 	public List<Spawned> spawned = new List<Spawned> ();
 	public float updateInterval = 0.5f;
 	public List<String> groups = new List<String> ();
+	public List<Faction> factions = new List<Faction> ();
 	#endregion
 	
 	void Awake ()
@@ -228,7 +236,7 @@ public class Controller : MonoBehaviour
 		for (int s=0; s<sell.Count; s++) {
 			for (int b = 0; b<buy.Count; b++) {
 				if (sell [s].typeID == buy [b].typeID &&
-					CheckGroups (postScripts[buy [b].postB], postScripts[sell [s].postA]) &&
+					CheckGroupsFactions (postScripts[buy [b].postB], postScripts[sell [s].postA]) &&
 					CheckLocation (sell [s].postA, buy [b].postB, sell [s].typeID)) {
 					compare.Add (new Trade{postA = sell [s].postA, postB = buy [b].postB, typeID = sell [s].typeID});
 				}
@@ -238,16 +246,35 @@ public class Controller : MonoBehaviour
 		#endregion
 	}
 	
-	public bool CheckGroups (TradePost postA, TradePost postB)
+	public bool CheckGroupsFactions (TradePost postA, TradePost postB)
+	{
+		if (CheckGroups (postA, postB) && CheckFactions (postA, postB))
+			return true;
+		else
+			return false;
+	}
+	
+	bool CheckGroups (TradePost postA, TradePost postB)
 	{
 		if (!allowGroups)
 			return true;
 		else {
-			for (int g1 = 0; g1<postA.groups.Count; g1++) {
-				for (int g2 = 0; g2<postB.groups.Count; g2++) {
-					if (postA.groups [g1].allow && postB.groups [g2].allow && postA.groups [g1].selection == postB.groups [g2].selection)
-						return true;
-				}
+			for (int g = 0; g<groups.Count; g++) {
+				if (postA.groups [g] && postB.groups [g])
+					return true;
+			}
+			return false;
+		}
+	}
+	
+	bool CheckFactions (TradePost postA, TradePost postB)
+	{
+		if (!allowFactions)
+			return true;
+		else {
+			for (int f = 0; f<factions.Count; f++) {
+				if (postA.factions [f] && postB.factions [f])
+					return true;
 			}
 			return false;
 		}
@@ -286,7 +313,7 @@ public class Controller : MonoBehaviour
 			}
 		} else {
 			for (int t = 0; t<traders.Count; t++) {
-				Trader traderScript = traderScripts[t];
+				Trader traderScript = traderScripts [t];
 				shortest = 0;
 				toAdd = false;
 				if (!traderScript.onCall) {
@@ -294,15 +321,17 @@ public class Controller : MonoBehaviour
 					if (compare.Exists (x => posts [x.postA] == traderScript.target)) {
 					#region post in compare
 						int c = compare.FindIndex (x => posts [x.postA] == traderScript.target);
-						List<Trade> sameLocations = compare.FindAll (x => posts [x.postA] == traderScript.target && x.postB == compare [c].postB);
+						if (TraderFaction (traderScript, postScripts[compare [c].postB])) {
+							List<Trade> sameLocations = compare.FindAll (x => posts [x.postA] == traderScript.target && x.postB == compare [c].postB);
 
-						TraderSet (traders [t], sameLocations, c, t);
+							TraderSet (traders [t], sameLocations, c, t);
+						}//check trader in same faction
 					#endregion
 					} else {//end if post not in compare => need to move to new post
 						for (int c = 0; c<compare.Count; c++) {
 							TradePost comparePostScript = postScripts [compare [c].postA];
 							if (!ongoing.Exists (x => x.buyPost == posts [compare [c].postB] && x.typeID == compare [c].typeID) && !moving.Exists (x => x.postB == compare [c].postA) &&
-								CheckGroups(targetScript, comparePostScript)) {
+								CheckGroupsFactions (targetScript, comparePostScript) && TraderFaction(traderScript, comparePostScript)) {
 								float distance = Vector3.Distance (traderScript.target.transform.position, posts [compare [c].postA].transform.position);
 								if ((distance < shortest || shortest == 0)) {//check distances
 									if (!poss.Exists (x => x.cNo == c)) {//check that compare has not previously been added
@@ -407,5 +436,16 @@ public class Controller : MonoBehaviour
 			}
 		}
 		poss.Clear ();
+	}
+	
+	bool TraderFaction (Trader traderScript, TradePost targetPost)
+	{
+		if(!allowFactions)
+			return true;
+		else{
+		for (int f = 0; f<factions.Count; f++)
+			if (traderScript.factions [f] && targetPost.factions [f])return true;
+		return false;
+		}
 	}
 }
