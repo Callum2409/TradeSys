@@ -28,11 +28,16 @@ namespace TradeSys
 				public void EnableDisable (SerializedProperty toChange, string enabled, bool enabledString)
 				{//have option to enable or disable anything displayed
 						GUILayout.FlexibleSpace ();
+						EditorGUILayout.BeginVertical();
+						GUILayout.Space(0f);
+						EditorGUILayout.BeginHorizontal();
 						if (GUILayout.Button ("Select all", EditorStyles.miniButtonLeft))
 								EnableDisable (toChange, true, enabled, enabledString);
 						if (GUILayout.Button ("Select none", EditorStyles.miniButtonRight))
 								EnableDisable (toChange, false, enabled, enabledString);
 						EditorGUILayout.EndHorizontal ();
+						EditorGUILayout.EndVertical();
+						EditorGUILayout.EndHorizontal();
 				}//end EnableDisable for single option
 	
 				public void EnableDisable (SerializedProperty toChange, string[] enabled, bool enabledString)
@@ -62,16 +67,29 @@ namespace TradeSys
 				public void HorizVertOptions (SerializedProperty showHoriz)
 				{//show the radio buttons for showing horizontally and vertically
 						EditorGUILayout.BeginHorizontal ();
-						showHoriz.boolValue = !EditorGUILayout.Toggle (new GUIContent ("Show items vertically", "Show items ascending vertically"), !(showHoriz.boolValue), "Radio");
-						showHoriz.boolValue = EditorGUILayout.Toggle (new GUIContent ("Show items horizontally", "Show items ascending horizontally"), showHoriz.boolValue, "Radio");
+						GUILayout.FlexibleSpace ();
+						EditorGUILayout.LabelField (new GUIContent ("Show items", "Show items ascending horizontally or vertically"), "MiniLabelRight");
+			
+						showHoriz.boolValue = GUILayout.Toggle (showHoriz.boolValue, new GUIContent ("Horizontally", "Show items ascending horizontally"), EditorStyles.miniButtonLeft);
+						showHoriz.boolValue = !GUILayout.Toggle (!(showHoriz.boolValue), new GUIContent ("Vertically", "Show items ascending vertically"), EditorStyles.miniButtonRight);
+						
 						EditorGUILayout.EndHorizontal ();
 				}//end HorizVert
 	
-				public void HorizVertDisplay (string[] names, SerializedProperty option, string property, bool showHoriz, int indentLevel)
+				public void HorizVertDisplay (string[] names, SerializedProperty option, string property, bool showHoriz, int indentLevel, bool line)
 				{//a list of bool options
+						if (line) {
+								EditorGUI.indentLevel = indentLevel - 1;
+								EditorGUILayout.LabelField ("", "", "PopupCurveSwatchBackground", GUILayout.MaxHeight (0f));
+						}
+				
 						EditorGUI.indentLevel = indentLevel;
 						if (showHoriz) {//if showing items horizontally
 								for (int b = 0; b<option.arraySize; b=b+2) {//add 2 each time because 2 option are being displayed
+								
+										if (line && b > 0)
+												EditorGUILayout.LabelField ("", "", "PopupCurveSwatchBackground", GUILayout.MaxHeight (0f));
+								
 										EditorGUILayout.BeginHorizontal ();
 										EditorGUILayout.PropertyField (option.GetArrayElementAtIndex (b).FindPropertyRelative (property), new GUIContent (names [b]));
 										if (b < option.arraySize - 1)//show the RH option if is less than length -1
@@ -83,6 +101,10 @@ namespace TradeSys
 						} else {//if showing items vertically
 								int half = Mathf.CeilToInt (option.arraySize / 2f);//get the halfway item rounded up so that an odd number will be displayed
 								for (int b = 0; b<half; b++) {//only need to go through half
+					
+										if (line && b > 0)
+												EditorGUILayout.LabelField ("", "", "PopupCurveSwatchBackground", GUILayout.MaxHeight (0f));
+					
 										EditorGUILayout.BeginHorizontal ();
 										EditorGUILayout.PropertyField (option.GetArrayElementAtIndex (b).FindPropertyRelative (property), new GUIContent (names [b]));
 										if (half + b < option.arraySize)
@@ -121,22 +143,16 @@ namespace TradeSys
 						}//end else show vertically
 				}//end HorizVertToDisplay for strings
 	
-				public void HorizVertDisplay (string[] names, SerializedProperty option, bool showHoriz, bool BSH)
-				{//a list with the BSH options, or straight up options
+				public void HorizVertDisplay (string[] names, SerializedProperty option, bool showHoriz)
+				{//a list with straight up options with no property
 						EditorGUI.indentLevel = 0;
 						if (showHoriz) {//if showing items horizontally
 								for (int b = 0; b<option.arraySize; b=b+2) {//add 2 each time because 2 option are being displayed
 										EditorGUILayout.BeginHorizontal ();
-										if (BSH) 
-												BSHDisp (names, option, b);
-										else
-												EditorGUILayout.PropertyField (option.GetArrayElementAtIndex (b), new GUIContent (names [b]));
+										EditorGUILayout.PropertyField (option.GetArrayElementAtIndex (b), new GUIContent (names [b]));
 				
 										if (b < option.arraySize - 1) {//show the RH option if is less than length -1
-												if (BSH)
-														BSHDisp (names, option, b + 1);
-												else
-														EditorGUILayout.PropertyField (option.GetArrayElementAtIndex (b + 1), new GUIContent (names [b + 1]));
+												EditorGUILayout.PropertyField (option.GetArrayElementAtIndex (b + 1), new GUIContent (names [b + 1]));
 										} else
 												EditorGUILayout.LabelField ("");
 										EditorGUILayout.EndHorizontal ();
@@ -145,32 +161,17 @@ namespace TradeSys
 								int half = Mathf.CeilToInt (option.arraySize / 2f);//get the halfway item rounded up so that an odd number will be displayed
 								for (int b = 0; b<half; b++) {//only need to go through half
 										EditorGUILayout.BeginHorizontal ();
-										if (BSH)
-												BSHDisp (names, option, b);
-										else
-												EditorGUILayout.PropertyField (option.GetArrayElementAtIndex (b), new GUIContent (names [b]));
+										EditorGUILayout.PropertyField (option.GetArrayElementAtIndex (b), new GUIContent (names [b]));
 					
 										if (half + b < option.arraySize) {
-												if (BSH)
-														BSHDisp (names, option, half + b);
-												else
-														EditorGUILayout.PropertyField (option.GetArrayElementAtIndex (half + b), new GUIContent (names [half + b]));
+												EditorGUILayout.PropertyField (option.GetArrayElementAtIndex (half + b), new GUIContent (names [half + b]));
 										} else
 												EditorGUILayout.LabelField ("");
 										EditorGUILayout.EndHorizontal ();
 								}//end for show items
 						}//end else show vertically
-				}//end HorizVertToDisplay for two bools
+				}//end HorizVertToDisplay for straight up options
 		
-				void BSHDisp (string[] names, SerializedProperty option, int o)
-				{//show the BSH options			
-						EditorGUILayout.LabelField (names [o], GUILayout.MaxWidth(100f));
-						GUILayout.FlexibleSpace();
-						EditorGUILayout.PropertyField (option.GetArrayElementAtIndex (o).FindPropertyRelative ("buy"), GUIContent.none, GUILayout.Width (15f));
-						EditorGUILayout.PropertyField (option.GetArrayElementAtIndex (o).FindPropertyRelative ("sell"), GUIContent.none, GUILayout.Width (15f));
-						EditorGUILayout.PropertyField (option.GetArrayElementAtIndex (o).FindPropertyRelative ("hidden"), GUIContent.none, GUILayout.Width (15f));
-				}//end BSH showing the individual options
-	
 				public void GetNames (Controller controller)
 				{//get all of the item names
 						controller.allNames = new string[controller.goods.Count][];
@@ -275,9 +276,20 @@ namespace TradeSys
 						EditorGUI.indentLevel = 0;
 						if (horizontal)
 								EditorGUILayout.BeginHorizontal ();
-						if (GUILayout.Button (title, "BoldLabel"))
-								toggle.boolValue = !toggle.boolValue;
+						TitleButton (title, toggle, "BoldLabel");
 						EditorGUI.indentLevel = 1;
+						return toggle.boolValue;
+				}//end TitleGroup
+				
+				public bool TitleButton (GUIContent title, SerializedProperty toggle, string style)
+				{//the title button to show or hide a group
+						EditorGUILayout.BeginVertical ();
+						GUILayout.Space (1f);
+						if (GUILayout.Button (title, style, GUILayout.MaxWidth(146f))) {
+								toggle.boolValue = !toggle.boolValue;
+								GUIUtility.keyboardControl = 0;
+						}
+						EditorGUILayout.EndVertical ();
 						return toggle.boolValue;
 				}//end TitleButton
 	
@@ -289,11 +301,200 @@ namespace TradeSys
 						EditorGUI.indentLevel = 0;
 				}//end IndentGroup
 	
-				public void StartScroll (SerializedProperty scrollPos, SerializedProperty enabled)
+				public Vector2 StartScroll (Vector2 scrollPos, SerializedProperty enabled)
 				{//draw a separating line, and if enabled, start a scroll view
 						EditorGUILayout.LabelField ("", "", "ShurikenLine", GUILayout.MaxHeight (1f));//draw a separating line
 						if (enabled.boolValue)//if smaller scroll views enabled
-								scrollPos.vector2Value = EditorGUILayout.BeginScrollView (scrollPos.vector2Value);	
+								scrollPos = EditorGUILayout.BeginScrollView (scrollPos);	
+						return scrollPos;
 				}//end StartScroll	
+				
+				public int Toolbar (int sel, string[] names)
+				{//show a toolbar with space either side
+						EditorGUILayout.BeginHorizontal ();
+						GUILayout.FlexibleSpace ();//flexible space so the size of the toolbar remains the same
+						
+						int selB = sel;
+						sel = GUILayout.Toolbar (sel, names);//show the toolbar
+						if (sel != selB)
+								GUIUtility.keyboardControl = 0;
+						
+						GUILayout.FlexibleSpace ();//another space so is in the middle
+						EditorGUILayout.EndHorizontal ();
+						return sel;
+				}//end Toolbar
+				
+				public void TGF (Controller controller, SerializedObject controllerSO, string pt, GUIContent title, SerializedProperty option, bool factions, string[] names, string name, string nameC)
+				{//show the tags, groups and factions options
+			
+						SerializedProperty expanded = controllerSO.FindProperty (nameC).FindPropertyRelative (pt);
+			
+						if (TitleGroup (title, expanded, true)) {//if showing TGF
+				
+								if (option.arraySize == 0)
+										expanded.boolValue = false;
+				
+								EnableDisable (option, "", false);
+								IndentGroup (1);
+								if (factions) {
+										names = new string[option.arraySize];//need the name of the factions in an array
+										for (int f = 0; f<option.arraySize; f++)
+												names [f] = controller.factions.factions [f].name;
+								}
+								HorizVertDisplay (names, option, controllerSO.FindProperty ("showHoriz").boolValue);
+				
+								EditorGUILayout.EndHorizontal ();
+						}//end if TGF expanded
+						EditorGUILayout.EndVertical ();
+			
+						EditorGUI.indentLevel = 0;
+			
+						if (option.arraySize == 0)
+								EditorGUILayout.HelpBox ("No " + name + " have been added, but " + name + " have been enabled. " + char.ToUpper (name [0]) + name.Substring (1)
+										+ " can be added in the controller", MessageType.Error);
+						EditorGUILayout.EndVertical ();
+				}//end TGF
+		
+				public bool AnyGoods (SerializedProperty goods, string property)
+				{//go through goods groups and see if there are any items
+						for (int g = 0; g<goods.arraySize; g++)
+								if (goods.GetArrayElementAtIndex (g).FindPropertyRelative (property).arraySize > 0)
+										return true;
+						return false;
+				}//end AnyGoods
+				
+				public Vector2 PTMan (SerializedProperty manufacturing, Vector2 scrollPos, SerializedProperty smallScroll, SerializedProperty controllerMan, Controller controller, SerializedObject obj, bool post)
+				{//the manufacturing options for posts and traders
+						EditorGUI.indentLevel = 0;
+			
+						EditorGUILayout.BeginHorizontal ();
+						EditorGUILayout.LabelField ("Manufacturing processes", EditorStyles.boldLabel);
+			
+						EnableDisable (manufacturing, "enabled", true);								
+			
+						scrollPos = StartScroll (scrollPos, smallScroll);
+			
+						if (AnyManufacturing (controllerMan, obj, post)) {
+								EditorGUILayout.LabelField ("", "", "PopupCurveSwatchBackground", GUILayout.MaxHeight (0f));
+				
+								for (int m = 0; m<controllerMan.arraySize; m++) {//go through manufacturing groups
+										SerializedProperty cManG = manufacturing.GetArrayElementAtIndex (m);
+										SerializedProperty cManGC = controllerMan.GetArrayElementAtIndex (m);
+					
+										if (ShowGroup (cManGC.FindPropertyRelative ("manufacture"), obj, post)) {//check that something in the group is showing to decide whether to show the title or not
+												EditorGUILayout.BeginHorizontal ();
+												EditorGUI.indentLevel = 0;
+						
+						SerializedProperty cManEn = cManG.FindPropertyRelative ("enabled");
+						
+					if(TitleButton(new GUIContent(cManGC.FindPropertyRelative ("name").stringValue, "Checkbox on the right enables the process group"), cManGC.FindPropertyRelative("expanded"+(post?"P":"T")), "BoldLabel") && cManEn.boolValue){//if group showing
+											
+												EditorGUILayout.BeginVertical();
+												GUILayout.Space(0f);
+												EditorGUILayout.PropertyField (cManEn, GUIContent.none, GUILayout.Width (15f));
+												EditorGUILayout.EndVertical();
+												GUILayout.FlexibleSpace ();
+						
+												EnableDisable (cManG.FindPropertyRelative ("manufacture"), "enabled", true);
+														for (int p = 0; p<cManG.FindPropertyRelative ("manufacture").arraySize; p++) {//go through current manufacture processes
+																SerializedProperty cMan = cManG.FindPropertyRelative ("manufacture").GetArrayElementAtIndex (p);
+																SerializedProperty cManC = cManGC.FindPropertyRelative ("manufacture").GetArrayElementAtIndex (p);
+								
+																if (CorrectEnabled (cManC, obj, post)) {
+									
+																		if (p == 0)
+																				EditorGUI.indentLevel = 0;
+																		EditorGUILayout.LabelField ("", "", "PopupCurveSwatchBackground", GUILayout.MaxHeight (0f));
+																		EditorGUI.indentLevel = 1;
+									
+																		EditorGUILayout.BeginHorizontal ();//horizontal to also show the times
+																		EditorGUILayout.BeginVertical ();//align the name vertically
+																		if (cMan.FindPropertyRelative ("enabled").boolValue)
+																				GUILayout.Space (10f);
+									
+																		EditorGUILayout.PropertyField (cMan.FindPropertyRelative ("enabled"), 
+									                               new GUIContent (cManC.FindPropertyRelative ("name").stringValue, controller.manufactureTooltips [m] [p]));
+																		EditorGUILayout.EndVertical ();
+									
+																		if (cMan.FindPropertyRelative ("enabled").boolValue) {//if enabled, allow times to be edited
+																				EditorGUILayout.BeginVertical ();//have the create and cooldown times vertically
+																				GUILayout.Space (1f);
+																				EditorGUILayout.PropertyField (cMan.FindPropertyRelative ("create"), new GUIContent ("Create time", "This is how long it takes between removing the items from sale to be manufactured and when the new items are available"));
+																				EditorGUILayout.PropertyField (cMan.FindPropertyRelative ("cooldown"), new GUIContent ("Cooldown time", "This is how long between one manufacture of this process and another"));
+																				EditorGUILayout.EndVertical ();
+																		}
+																		if (cMan.FindPropertyRelative ("create").intValue < 1)
+																				cMan.FindPropertyRelative ("create").intValue = 1;
+									
+																		if (cMan.FindPropertyRelative ("cooldown").intValue < 0)
+																				cMan.FindPropertyRelative ("cooldown").intValue = 0;
+									
+																		EditorGUILayout.EndHorizontal ();
+									
+																} else//end check if not able to, make sure is disabled
+																		cMan.FindPropertyRelative ("enabled").boolValue = false;
+														}//end for manufacturing processes														
+														}else{//end if showing group
+							EditorGUILayout.BeginVertical();
+						GUILayout.Space(0f);
+							EditorGUILayout.PropertyField (cManEn, GUIContent.none, GUILayout.Width (15f));
+						EditorGUILayout.EndVertical();
+						GUILayout.FlexibleSpace ();
+							EditorGUILayout.EndHorizontal ();}
+						
+												EditorGUI.indentLevel = 0;
+												EditorGUILayout.LabelField ("", "", "PopupCurveSwatchBackground", GUILayout.MaxHeight (0f));
+										}//check that something is enabled in order to show the title
+								}//end for manufacturing groups
+						} else//end if something to show
+								EditorGUILayout.HelpBox ("No processes have been added or the required items have not been enabled.\nCheck that processes have been set up in the controller and that items have been enabled.", MessageType.Info);
+						return scrollPos;
+				}//end PTMan
+				
+				bool CorrectEnabled (SerializedProperty check, SerializedObject obj, bool post)
+				{//go through all needing and making lists, checking that the correct items have been enabled to allow manufacture
+						SerializedProperty currentNeeding = check.FindPropertyRelative ("needing");
+						for (int n = 0; n<currentNeeding.arraySize; n++) {//go through all needing lists
+								if (!IsEnabled (currentNeeding.GetArrayElementAtIndex (n).FindPropertyRelative ("itemID").intValue, 
+				                currentNeeding.GetArrayElementAtIndex (n).FindPropertyRelative ("groupID").intValue, true, obj, post))
+										return false;
+						}
+						return true;
+				}//end CorrectEnabled
+		
+				bool IsEnabled (int itemID, int groupID, bool needing, SerializedObject obj, bool post)
+				{//check to see if the current needing / making item is enable
+						if (post) {//if post
+								SerializedProperty checking = obj.FindProperty ("stock").GetArrayElementAtIndex (groupID).FindPropertyRelative ("stock").GetArrayElementAtIndex (itemID);
+			
+								//postNormal.stock [groupID].stock [itemID];
+								if (checking.FindPropertyRelative ("hidden").boolValue)//if the item is hidden, then count as enabled
+										return true;
+								if (needing)//if the item is in the needing, post needs to be able to buy the item
+										return checking.FindPropertyRelative ("buy").boolValue;
+								else//else if in the making, needs to be able to sell
+										return checking.FindPropertyRelative ("sell").boolValue;
+				
+						} else {//else if trader
+								return obj.FindProperty ("items").GetArrayElementAtIndex (groupID).FindPropertyRelative ("items").GetArrayElementAtIndex (itemID).FindPropertyRelative ("enabled").boolValue;
+						}//end else trader
+				}//end IsEnabled
+		
+				bool ShowGroup (SerializedProperty check, SerializedObject obj, bool post)
+				{//needs to check that there is something enabled in order to show the title
+						for (int c = 0; c<check.arraySize; c++) {//go through all checking group
+								if (CorrectEnabled (check.GetArrayElementAtIndex (c), obj, post))
+										return true;
+						}//end for checking group
+						return false;
+				}//end ShowGroup
+		
+				bool AnyManufacturing (SerializedProperty manufacturing, SerializedObject obj, bool post)
+				{//go through manufacturing and see if any are shown
+						for (int m = 0; m< manufacturing.arraySize; m++)
+								if (ShowGroup (manufacturing.GetArrayElementAtIndex (m).FindPropertyRelative ("manufacture"), obj, post))
+										return true;
+						return false;
+				}//end AnyManufacturing
 		}//end TSGUI
 }//end namespace

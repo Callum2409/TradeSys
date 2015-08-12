@@ -7,25 +7,23 @@ namespace TradeSys
 {//use namespace to stop any name conflicts
 		public class Controller : MonoBehaviour
 		{
-		#region options
-				public bool showLinesInGame;//whether lines are shown in the game view
-				public int selC;//the currently selected tab in controller
-				public int selP;//the currently selected tab in trade posts
-				public int selGC;//the currently selected goods type in controller
-				public int selMC;//the currently selected manufacture group in controller
+		#if UNITY_EDITOR
+				public Selected selected = new Selected();//the selected items in toolbars
 				public bool showGN;//show the name of the group that the item belongs to in the manufacturing list
 				public bool showPrices;//show the price of the good in the post editor
 				public bool smallScroll = true;//have a scroll bar in the goods and manufacturing menus
-				public Vector2 scrollPosS, scrollPosG, scrollPosM, scrollPosPS, scrollPosPG, scrollPosPM, scrollPosT, scrollPosGG, scrollPosMG;//the scroll positions of different menus
+				public ScrollPos scrollPos = new ScrollPos();//the scroll positions
 				public bool showHoriz;//show a list of items horizontally or vertically
-				public bool genOp, gamOp, traOp, pauOp;//the bools for if each option is showing
+				public bool genOp, gamOp, traOp, pauOp;//the bools for if each option is showing in the controller
+				public bool opTP, opT;//the bools for if the options are showing for trade posts or traders
 				public string[][] allNames;//an array for each group with an array of the names
 				public string[][] manufactureNames;//an array with the names of each manufacturing process
 				public string[][] manufactureTooltips;//an array of strings with the tooltip for the manufacturng processes
-		#endregion
+		#endif
 	
 		#region used variables
 		#region in editor
+				public bool showLinesInGame;//whether lines are shown in the game view
 				public float updateInterval = 0.5f;//set the time between subsequent updates
 				public bool showLinks = false;//show possible trade links
 	
@@ -76,7 +74,7 @@ namespace TradeSys
 				void Start ()
 				{//at the start, the only thing that can be checked is to see if generate has been selected
 						//if is has been selected, then generate and the rest can continue, but if not, then needs to wait to be called
-						//this is done once all of the trade posts have been set up from your code.
+						//this is done once all of the trade posts have been set up from your code.	
 						if (generateAtStart)//generate the distances if the trade posts have been set up
 								GenerateDistances ();
 						if (showLinesInGame)//if set debug bool to show lines in the game view
@@ -191,7 +189,7 @@ namespace TradeSys
 				{//check in same faction
 						if (factions.enabled) {//check if factions enabled
 								for (int f = 0; f<factions.factions.Count; f++)//go through factions
-										if (post1.factions.enabled [f] && post2.factions.enabled [f])//if both have the factions enabled
+										if (post1.factions [f] && post2.factions [f])//if both have the factions enabled
 												return true;
 								return false;//if no factions match, return false
 						} else//end if factions enabled
@@ -202,7 +200,7 @@ namespace TradeSys
 				{//Check in same group
 						if (groups.enabled) {//check if groups enabled
 								for (int g = 0; g<groups.names.Count; g++)//go through groups
-										if (post1.groups.enabled [g] && post2.groups.enabled [g])//if both have the groups enabled
+										if (post1.groups [g] && post2.groups [g])//if both have the groups enabled
 												return true;
 								return false;//if no groups match, return false
 						} else//end if groups enanled
@@ -213,7 +211,7 @@ namespace TradeSys
 				{//Check that the trader is in the same faction as the trade post
 						if (factions.enabled) {//check if factions enabled
 								for (int f = 0; f<factions.factions.Count; f++) {//go through factions
-										if (trader.factions [f] && post.factions.enabled [f])//if both have the factions enabled
+										if (trader.factions [f] && post.factions [f])//if both have the factions enabled
 												return true;
 								}//end for factions
 								return false;//if no factions match, return false
@@ -247,7 +245,7 @@ namespace TradeSys
 										int total = 0;//the number of items available
 										for (int p = 0; p<postScripts.Length; p++) {//go through all posts
 												Stock current = postScripts [p].stock [g].stock [i];
-												if ((current.buy || current.sell) && postScripts[p].allowTrades) {//if is enabled at the post and trade post allowed to trade
+												if ((current.buy || current.sell) && postScripts [p].allowTrades) {//if is enabled at the post and trade post allowed to trade
 														count++;//increase the post count
 														total += current.number;//increase the total
 												}//end check is enabled
@@ -274,10 +272,19 @@ namespace TradeSys
 				{//Update the post prices and sort the traders
 						for (int p = 0; p< tradePostCount; p++) { //set updates to false, so only the required prices are updated and only once
 								postScripts [p].updated = false;//set to false so that prices can be updated if necessary
-								postScripts [p].ManufactureCheck ();
+								postScripts [p].ManufactureCheck ();//call the manufacturing methods in the trade post
 						}
+						for (int t = 0; t<traderCount; t++)
+								traderScripts [t].ManufactureCheck ();
 						TradeCall ();//call the TradeCall method, to tell traders where to go
 				}//end UpdateMethods
+				
+				public void SortAll ()
+				{//sort out all trade posts and traders
+						SortTradePosts ();
+						SortTraders ();
+						ManufactureMass ();
+				}//end SortAll
 	
 				public void SortTradePosts ()
 				{//make sure that all trade posts have the required settings
@@ -311,7 +318,7 @@ namespace TradeSys
 			
 						for (int m = 0; m<thisPost.manufacture.Count; m++) {//for each group
 								while (thisPost.manufacture[m].manufacture.Count<manufacture[m].manufacture.Count)//while not enough
-										thisPost.manufacture [m].manufacture.Add (new PostMnfctr{});
+										thisPost.manufacture [m].manufacture.Add (new RunMnfctr{});
 								if (thisPost.manufacture [m].manufacture.Count > manufacture [m].manufacture.Count)//if too many, remove extra
 										thisPost.manufacture [m].manufacture.RemoveRange (manufacture [m].manufacture.Count, thisPost.manufacture [m].manufacture.Count - manufacture [m].manufacture.Count);
 						}
@@ -319,29 +326,28 @@ namespace TradeSys
 	
 						#region sort tags
 						if (postTags.enabled) {//only need to sort if enabled
-								while (thisPost.tags.enabled.Count<postTags.names.Count)//while not enough tags
-										thisPost.tags.enabled.Add (false);
-								if (thisPost.tags.enabled.Count > postTags.names.Count)//if too many tags
-										thisPost.tags.enabled.RemoveRange (postTags.names.Count, thisPost.tags.enabled.Count - postTags.names.Count);
+								while (thisPost.tags.Count<postTags.names.Count)//while not enough tags
+										thisPost.tags.Add (false);
+								if (thisPost.tags.Count > postTags.names.Count)//if too many tags
+										thisPost.tags.RemoveRange (postTags.names.Count, thisPost.tags.Count - postTags.names.Count);
 						}//end if enabled
 						#endregion
 		
 						#region sort groups
 						if (groups.enabled) {//only need to sort if enabled
-								while (thisPost.groups.enabled.Count<groups.names.Count)//while not enough groups
-										thisPost.groups.enabled.Add (false);
-								if (thisPost.groups.enabled.Count > groups.names.Count)//if too many groups
-										thisPost.groups.enabled.RemoveRange (groups.names.Count, thisPost.groups.enabled.Count - groups.names.Count);
+								while (thisPost.groups.Count<groups.names.Count)//while not enough groups
+										thisPost.groups.Add (false);
+								if (thisPost.groups.Count > groups.names.Count)//if too many groups
+										thisPost.groups.RemoveRange (groups.names.Count, thisPost.groups.Count - groups.names.Count);
 						}//end if enabled
 						#endregion
 		
 						#region sort factions
 						if (factions.enabled) {//only need to sort if enabled
-								while (thisPost.factions.enabled.Count<factions.factions.Count)//while not enough factions
-			
-										thisPost.factions.enabled.Add (false);
-								if (thisPost.factions.enabled.Count > factions.factions.Count)//if too many factions
-										thisPost.factions.enabled.RemoveRange (factions.factions.Count, thisPost.factions.enabled.Count - factions.factions.Count);
+								while (thisPost.factions.Count<factions.factions.Count)//while not enough factions
+										thisPost.factions.Add (false);
+								if (thisPost.factions.Count > factions.factions.Count)//if too many factions
+										thisPost.factions.RemoveRange (factions.factions.Count, thisPost.factions.Count - factions.factions.Count);
 						}//end if enabled
 						#endregion
 				}//end SortTradePost
@@ -355,27 +361,68 @@ namespace TradeSys
 				public void SortTrader (Trader thisTrader)
 				{//sort out the trader so shows correct items
 						#region sort goods
-						while (thisTrader.allowItems.Count < goods.Count)//while not enough groups
-								thisTrader.allowItems.Add (new AllowGroup{});
-						if (thisTrader.allowItems.Count > goods.Count)//if too many, remove extra
-								thisTrader.allowItems.RemoveRange (goods.Count, thisTrader.allowItems.Count - goods.Count);
+						while (thisTrader.items.Count < goods.Count)//while not enough groups
+								thisTrader.items.Add (new ItemGroup{});
+						if (thisTrader.items.Count > goods.Count)//if too many, remove extra
+								thisTrader.items.RemoveRange (goods.Count, thisTrader.items.Count - goods.Count);
 						//should now have the correct number of groups
 		
-						for (int a = 0; a<thisTrader.allowItems.Count; a++) {//for each group
-								while (thisTrader.allowItems[a].allowItems.Count < goods[a].goods.Count)//while not enough goods
-										thisTrader.allowItems [a].allowItems.Add (new AllowItem{ enabled = true});
-								if (thisTrader.allowItems [a].allowItems.Count > goods [a].goods.Count) //if too many, remove extra
-										thisTrader.allowItems [a].allowItems.RemoveRange (goods [a].goods.Count, thisTrader.allowItems [a].allowItems.Count - goods [a].goods.Count);
+						for (int a = 0; a<thisTrader.items.Count; a++) {//for each group
+								while (thisTrader.items[a].items.Count < goods[a].goods.Count)//while not enough goods
+										thisTrader.items [a].items.Add (new Item{ enabled = true});
+								if (thisTrader.items [a].items.Count > goods [a].goods.Count) //if too many, remove extra
+										thisTrader.items [a].items.RemoveRange (goods [a].goods.Count, thisTrader.items [a].items.Count - goods [a].goods.Count);
 						}
 						#endregion
-						while (thisTrader.factions.Count<factions.factions.Count)//while not enough factions
-								thisTrader.factions.Add (false);
-						if (thisTrader.factions.Count > factions.factions.Count)//if too many factions
-								thisTrader.factions.RemoveRange (factions.factions.Count, thisTrader.factions.Count - factions.factions.Count);
+						
+						#region sort manufacturing
+						while (thisTrader.manufacture.Count<manufacture.Count)//while not enough
+								thisTrader.manufacture.Add (new MnfctrGroup{});
+						if (thisTrader.manufacture.Count > manufacture.Count)//if too many, remove extra
+								thisTrader.manufacture.RemoveRange (manufacture.Count, thisTrader.manufacture.Count - manufacture.Count);
+						//should now have the correct number of groups
+			
+						for (int m = 0; m<thisTrader.manufacture.Count; m++) {//for each group
+								while (thisTrader.manufacture[m].manufacture.Count<manufacture[m].manufacture.Count)//while not enough
+										thisTrader.manufacture [m].manufacture.Add (new RunMnfctr{});
+								if (thisTrader.manufacture [m].manufacture.Count > manufacture [m].manufacture.Count)//if too many, remove extra
+										thisTrader.manufacture [m].manufacture.RemoveRange (manufacture [m].manufacture.Count, thisTrader.manufacture [m].manufacture.Count - manufacture [m].manufacture.Count);
+						}
+						#endregion
+						
 						#region factions
-
+						if (factions.enabled) {//only need to sort if factions enabled
+								while (thisTrader.factions.Count<factions.factions.Count)//while not enough factions
+										thisTrader.factions.Add (false);
+								if (thisTrader.factions.Count > factions.factions.Count)//if too many factions
+										thisTrader.factions.RemoveRange (factions.factions.Count, thisTrader.factions.Count - factions.factions.Count);
+						}//end if factions enabled
 						#endregion
 				}//end SortTrader
+				
+				public void ManufactureMass ()
+				{//go through manufacture processes and calculate the needing and making masses
+						for (int m = 0; m<manufacture.Count; m++) {//go through groups
+								for (int p = 0; p<manufacture[m].manufacture.Count; p++) {//go throughprocesses
+										Mnfctr cMan = manufacture [m].manufacture [p];
+				
+										cMan.needingMass = ManufactureMass (cMan.needing);
+										cMan.makingMass = ManufactureMass (cMan.making);
+			
+								}//end for processes
+						}//end for groups
+				}//end ManufactureMass
+				
+				float ManufactureMass (List<NeedMake> cNM)
+				{//return the mass of the needing or making list provided
+						float mass = 0;
+						NeedMake cItem = new NeedMake ();
+						for (int nm = 0; nm<cNM.Count; nm++) {//go through list
+								cItem = cNM [nm];
+								mass += goods [cItem.groupID].goods [cItem.itemID].mass * cItem.number;//add to total mass
+						}//end for list
+						return mass;
+				}//end ManufactureMass
 	
 				void TradeCall ()
 				{//go through all of the traders, checking the nearest posts and working out the best to go to
@@ -404,11 +451,11 @@ namespace TradeSys
 														int quantity = Mathf.Min ((int)System.Math.Floor (trader.spaceRemaining / mass), cTrade.quantity,
 							Mathf.FloorToInt (trader.cash / price));
 						
-														if (quantity > 0) {//check that adding cargo
-																trader.cargo.Add (new NeedMake{ groupID = cTrade.groupID, itemID = cTrade.itemID, number = quantity});//add to lists
+														if (quantity > 0) {//check that adding cargo														
+																trader.items [cTrade.groupID].items [cTrade.itemID].number += quantity;//add to cargo
 																trader.spaceRemaining -= quantity * mass;//remove the space at the start, if cant afford, space and quantity updated at end
 																totalTime += quantity * cGood.pausePerUnit;//multiply the time by the quantity
-							
+																
 																for (int q = 0; q<quantity; q++) {//add the quantity individually
 																		if (trader.cash >= price) {
 																				//make sure that the trader can afford to buy more items
@@ -422,8 +469,9 @@ namespace TradeSys
 																				//trader can no longer afford all of the items
 																				int unable = quantity - q;//the number of items that the trader was unable to purchase
 																				trader.spaceRemaining += unable * mass;//give the space remaining back
-																				trader.cargo [trader.cargo.Count - 1].number -= unable;//reduce the number carried
+																				trader.items [cTrade.groupID].items [cTrade.itemID].number -= unable;//reduce the number carried
 																				totalTime -= unable * cGood.pausePerUnit;//reduce the pause time
+																				break;
 																		}//end else can't afford
 																}//end for all items to add
 														}//check enough space remaining
@@ -433,6 +481,7 @@ namespace TradeSys
 														//still continues through loop if there is some space left because may be smaller items to be added
 												}//end for all cargo trades
 												post.UpdatePrices ();//update the prices at the trade post
+																					
 												trader.onCall = true;//set the trader to be doing something, so will not be given new trades
 												trader.finalPost = postScripts [trades [0].postID];//set the final post to the TradePost script to make it easier when trader gets there
 												trader.target = trader.finalPost.gameObject;//set the target to the trade post game object
@@ -441,14 +490,14 @@ namespace TradeSys
 										} else {//if no trades, then needs to move
 												if (randomPost) {//if random posts selected, go to a random post in the closest
 														if (CheckTraderFaction (trader, postScripts [traderPostID])) {//check that the trader is in the same faction as the trade post in the first place
-																Distances[] reachable = System.Array.FindAll<Distances> (closest [traderPostID], x => (x.post != -1) && CheckTraderFaction (trader, postScripts [x.post]) && postScripts[x.post].allowTrades);//get all of the reachable posts
+																Distances[] reachable = System.Array.FindAll<Distances> (closest [traderPostID], x => (x.post != -1) && CheckTraderFaction (trader, postScripts [x.post]) && 
+								                                                         CheckFactionsGroups(postScripts[traderPostID], postScripts[x.post]) && postScripts [x.post].allowTrades);//get all of the reachable posts
 																//make the reachable array up of posts that are possible to get to, by making sure not -1 and in the same faction
 																if (reachable.Length == 0) {
 																		Debug.LogError (trader.name + " has no reachable posts! This may be due to incorrect factions or groups");
 																		break;
 																}
-																int randomIndex = Random.Range (0, reachable.Length);
-																int selectedPost = reachable [randomIndex].post;
+																int selectedPost = reachable [Random.Range (0, reachable.Length)].post;
 																trader.onCall = true;//set to true, so will not be told other posts
 																trader.finalPost = postScripts [selectedPost];//set the final post
 																trader.target = trader.finalPost.gameObject;//set the target gameobject
@@ -484,7 +533,7 @@ namespace TradeSys
 						}//end if not updated current post
 						for (int p = 0; p<closestPosts; p++) {
 								int cPID = closest [postID] [p].post;
-								if (cPID != -1 && !postScripts [cPID].updated && postScripts[cPID].allowTrades) {//check not -1 or price already updated and allowed to trade
+								if (cPID != -1 && !postScripts [cPID].updated && postScripts [cPID].allowTrades) {//check not -1 or price already updated and allowed to trade
 										postScripts [cPID].UpdatePrices ();
 										postScripts [cPID].updated = true;
 								}//end if not -1 and not updated post
@@ -511,15 +560,20 @@ namespace TradeSys
 												if (currentPostID != -1) {//check that the post is not -1. If it is, then can't get there anyway
 														Stock currentPostStock = postScripts [currentPostID].stock [g].stock [i];
 														if (currentPostStock.buy) {//check if item is enabled
-																if (Mathf.RoundToInt (currentPostStock.number * buyMultiple) < itemAverage ) //check that post wants to buy
-																tradeLists [currentPostID].buy.Add (new BuySell{groupID = g, itemID = i});
+																if (Mathf.RoundToInt (currentPostStock.number * buyMultiple) < itemAverage) //check that post wants to buy
+																		tradeLists [currentPostID].buy.Add (new BuySell{groupID = g, itemID = i});
 														}//end enabled check
-														tradeLists [currentPostID].buy = tradeLists [p].buy.Distinct ().ToList ();
 												}//end check not -1
 										}//end for closest posts
 										#endregion
 								}//end for items
 						}//end for groups
+						
+						for (int p = 0; p<closestPosts; p++) {//go through the closest posts
+								int currentPostID = closest [postID] [p].post;
+								if (currentPostID != -1)
+										tradeLists [currentPostID].buy = tradeLists [currentPostID].buy.Distinct ().ToList ();
+						}//end for closest posts
 		
 						#region remove current
 						TradePost cP = postScripts [postID];
@@ -560,12 +614,12 @@ namespace TradeSys
 
 						for (int p = 0; p<closestPosts; p++) {//go through closest posts
 								int currentPostID = closest [postID] [p].post;
-								if (currentPostID != -1 && CheckTraderFaction (traderScripts [traderID], postScripts [currentPostID]) && postScripts[currentPostID].allowTrades) {
+								if (currentPostID != -1 && CheckTraderFaction (traderScripts [traderID], postScripts [currentPostID]) && postScripts [currentPostID].allowTrades) {
 										//check not -1, so can actually get to the trade post, and check that they are in the same faction, and check that trading is allowed
-										intersect = sell.Intersect (tradeLists [p].buy).ToList ();				
+										intersect = sell.Intersect (tradeLists [currentPostID].buy).ToList ();
 										for (int i = 0; i<intersect.Count; i++) {//go through all items in intersect
 												BuySell cI = intersect [i];
-												if (traderScripts [traderID].allowItems [cI.groupID].allowItems [cI.itemID].enabled) {//check that the trader is allowed to take the cargo
+												if (traderScripts [traderID].items [cI.groupID].items [cI.itemID].enabled) {//check that the trader is allowed to take the cargo
 														int quantity = TradeQuantity (postID, currentPostID, cI.groupID, cI.itemID, traderID);
 					
 														if (quantity > 0) {//only work out profit and add if there is more than one to trade		
@@ -581,7 +635,7 @@ namespace TradeSys
 						//now needs to find the best of the trades
 						if (trades.Count > 0) {//only sort if there is something to sort
 								trades.Sort ();
-								return trades.FindAll (x => x.postID == trades [0].postID);//only return those in the same group as the best
+								return  trades.FindAll (x => x.postID == trades [0].postID);//only return those in the same group as the best
 						}
 						return null;//retun null if no trades available
 				}//end BestTrade
@@ -595,7 +649,7 @@ namespace TradeSys
 						int buyQuantity = Mathf.RoundToInt (avg - (postScripts [t].stock [gID].stock [iID].number * buyMultiple));
 						//will now return the minimum of the buy and sell quantities, the number that can fit in the cargo space, 
 						//and the number that the trader can purchase, and the number that the trade post can purchase
-						return (int)Mathf.Min (sellQuantity, buyQuantity, (float)(traderScripts [traderID].cargoSpace / good.mass), 
+						return (int)Mathf.Min (sellQuantity, buyQuantity, (float)(traderScripts [traderID].spaceRemaining / good.mass), 
 				Mathf.FloorToInt (traderScripts [traderID].cash / cP.price), Mathf.FloorToInt (postScripts [t].cash / (postScripts [t].stock [gID].stock [iID].price * purchasePercent)));
 				}//end TradeQuantity
 	
@@ -626,7 +680,7 @@ namespace TradeSys
 												} else {//else, needs to get the colours of the factions
 														List<Color> colours = new List<Color> ();
 														for (int f = 0; f<factions.factions.Count; f++) {//go through factions, getting the colour if the faction matches
-																if (postScripts [p1].factions.enabled [f] && postScripts [p2].factions.enabled [f])//check in the same faction
+																if (postScripts [p1].factions [f] && postScripts [p2].factions [f])//check in the same faction
 																		colours.Add (factions.factions [f].colour);//add the colour to the list
 														}//end for factions
 														int coloursCount = colours.Count;//the number of colours
@@ -636,7 +690,7 @@ namespace TradeSys
 																if (Application.isPlaying && showLinesInGame) {//is is playing, use line renderer
 																		LineRenderer linef = new GameObject ().AddComponent<LineRenderer> ();
 																		linef.transform.parent = this.transform;
-																		linef.name = tradePosts[p1].name+" "+tradePosts[p2].name+" "+c;
+																		linef.name = tradePosts [p1].name + " " + tradePosts [p2].name + " " + c;
 																		linef.material = new Material (Shader.Find ("Self-Illumin/Diffuse"));
 																		linef.material.color = colours [c];
 																		linef.SetPosition (0, (line * c) + tradePosts [p1].transform.position);
@@ -652,5 +706,24 @@ namespace TradeSys
 						}//end if in the same faction / group
 				}//end DrawLines
 		
+				public void EditProcess (List<MnfctrGroup> manufacture, int manufactureGroup, int processNumber, bool enabled, int createTime, int cooldownTime)
+				{//edit the manufacturing process details for a trade post or trader
+
+						//need to check that has received valid changes
+						if (manufactureGroup > manufacture.Count || manufactureGroup < 0)//check that group is valid
+								Debug.LogError ("Invalid manufacture group number");
+						if (processNumber > manufacture [manufactureGroup].manufacture.Count || processNumber < 0)//check that process is valid
+								Debug.LogError ("Invalid manufacture process number");
+						if (createTime < 1)//check create time
+								Debug.LogError ("Create time should be greater than 1");
+						if (cooldownTime < 0)//check cooldown time
+								Debug.LogError ("Cooldown time should be greater than 0");
+				
+						RunMnfctr editing = manufacture [manufactureGroup].manufacture [processNumber];//get the process to edit
+						editing.enabled = enabled;//set if enabled or not
+						editing.create = createTime;//set the create time
+						editing.cooldown = cooldownTime;//set the cooldown time
+						manufacture [manufactureGroup].manufacture [processNumber] = editing;//apply the changes
+				}//end EditProcess
 		}//end Controller
 }//end namespace

@@ -10,6 +10,7 @@ namespace TradeSys {//use namespace to stop any name conflicts
 		public int numberOfPosts;//set the number of posts
 		public float sphereRadius;//set how far away each post can be
 		public int numberOfTraders;//the number of traders
+		public int min = 0, max = 30;//the min and max number of items
 	
 		Controller controller;//the controller
 	
@@ -27,7 +28,7 @@ namespace TradeSys {//use namespace to stop any name conflicts
 			
 				for (int g = 0; g<controller.goods.Count; g++) {//go through all groups
 					for (int s = 0; s<controller.goods[g].goods.Count; s++)//go through all goods
-						newPost.stock [g].stock [s].number = Random.Range (0, 50);//set the number of items. dont need to add because is sorted in the trade post script
+						newPost.stock [g].stock [s].number = Random.Range (min, max);//set the number of items. dont need to add because is sorted in the trade post script
 				}//end for groups
 			
 				for (int m = 0; m<controller.manufacture.Count; m++) {//go through all manufacture groups
@@ -43,13 +44,13 @@ namespace TradeSys {//use namespace to stop any name conflicts
 			
 				if (controller.groups.enabled) {//if groups enabled, need to generate the groups
 					for (int g = 0; g<controller.groups.names.Count; g++) {//go through all groups
-						newPost.groups.enabled [g] = System.Math.Round (Random.value, System.MidpointRounding.AwayFromZero) == 0 ? true : false;
+						newPost.groups [g] = System.Math.Round (Random.value, System.MidpointRounding.AwayFromZero) == 0 ? true : false;
 						//generate a random value between 0 and 1, round it and use that to decide whether or not a group is selected
 					}//end for groups			
 				}//end if groups enabled
 				if (controller.factions.enabled) {//if factions enabled, need to generate the factions
 					for (int f = 0; f<controller.factions.factions.Count; f++) {//go through all factions
-						newPost.factions.enabled [f] = System.Math.Round (Random.value, System.MidpointRounding.AwayFromZero) == 0 ? true : false;
+						newPost.factions[f] = System.Math.Round (Random.value, System.MidpointRounding.AwayFromZero) == 0 ? true : false;
 						//generate a random value between 0 and 1, round it and use that to decide whether or not a faction is selected
 					}//end for groups			
 				}//end if groups enabled
@@ -72,7 +73,7 @@ namespace TradeSys {//use namespace to stop any name conflicts
 			
 				if (controller.factions.enabled) {//if factions enabled, need to generate the factions
 					for (int f = 0; f<controller.factions.factions.Count; f++) {//go through all factions
-						newTrader.factions [f] = System.Math.Round (Random.value, System.MidpointRounding.AwayFromZero) == 0 ? true : false;
+						newTrader.factions[f] = System.Math.Round (Random.value, System.MidpointRounding.AwayFromZero) == 0 ? true : false;
 						//generate a random value between 0 and 1, round it and use that to decide whether or not a faction is selected
 						//NOTE: This may cause TradeSys to tell you that the trader cannot do anything because the faction of the starting post is not the same
 						//so some code would need to be added to check that the factions are similar, and if not then either select a similar faction or a new 
