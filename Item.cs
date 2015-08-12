@@ -10,10 +10,12 @@ namespace TradeSys
 				public int groupID, itemID, number;//details of item + number of item in crate
 				public bool traderCollect;//whether a trader can collect the item or not
 				public bool spawned = false;//whether this item was made at a spawner or not
+				public bool dropped = false;//whether the item has been dropped or not
 				
-		void Awake()
+		void Start()
 		{
-			GameObject.FindGameObjectWithTag(Tags.C).GetComponent<Controller>().UpdateAverage(groupID, itemID, number, 0);//add this item to the controller info
+			if(!dropped)//only need to update the average if hasnt been dropped
+				GameObject.FindGameObjectWithTag(Tags.C).GetComponent<Controller>().UpdateAverage(groupID, itemID, number, 0);//add this item to the controller info
 			tag = Tags.I;//make sure the tag has been set
 		}//end Awake
 		

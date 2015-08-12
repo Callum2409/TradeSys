@@ -183,7 +183,7 @@ namespace TradeSys
 						
 						//calculate hash code
 						//done this way to ensure that each is distinct. This allows for up to 100 items per stock group
-						return (10^(hashGroupID*2))*(hashItemID+1);
+						return (10 ^ (hashGroupID * 2)) * (hashItemID + 1);
 				}
 		}
 
@@ -237,6 +237,14 @@ namespace TradeSys
 		{//contains a string name and a colour for the faction
 				public string name;
 				public Color colour = Color.green;
+		}
+		
+		[System.Serializable]
+		public class ExpendableList
+		{//used for the expendable traders
+				public bool enabled, expandedC;
+				public int maxNoTraders = 100;
+				public List<Trader> traders = new List<Trader> ();
 		}
 
 		[System.Serializable]

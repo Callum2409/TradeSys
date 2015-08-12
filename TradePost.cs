@@ -39,14 +39,14 @@ namespace TradeSys
 	
 				public void UpdatePrices ()
 				{//set the prices of goods
-						if (!customPricing) {//if custom pricing, then the prices are not set automatically
+			if (!customPricing && !controller.expTraders.enabled) {//if custom pricing, then the prices are not set automatically, and if expendable then not required at all
 								for (int g = 0; g<stock.Count; g++) {//go through all groups
 										for (int i = 0; i<stock[g].stock.Count; i++) {//go through all items
 												if (!stock [g].stock [i].hidden)//only needs to update the price if it is not hidden
 														UpdateSinglePrice (g, i);
 										}//end for all items		
 								}//end for all groups
-						}//end ig not custom pricing
+						}//end if not custom pricing
 				}//end UpdatePrices
 	
 				public void UpdateSinglePrice (int g, int i)
@@ -167,7 +167,7 @@ namespace TradeSys
 								}//end for groups
 								allowTrades = enableTrades;//set to new value
 				if(!enableTrades)
-				controller.TraderAllHome(postID);//need to sort destinations of traders enroute
+					controller.TraderAllHome(postID);//need to sort destinations of traders enroute
 			}//end check changing trades
 						allowManufacture = enableManufacture;//set to the value
 				}//end EnableDisableTradeMan
@@ -217,23 +217,23 @@ namespace TradeSys
 		/// </summary>
 		/// <param name="factionsGroups">If set to <c>true</c> will change the factions. Set to <c>false</c> to change groups</param>
 		/// <param name="toChange">The enabled factions or groups</param>
-			public void ChangeFactionsGroups(bool factionsGroups, List<bool> toChange){
-				if((factionsGroups && controller.factions.enabled) || (!factionsGroups && controller.groups.enabled)){//only need to make changes if enabled
-					if(toChange.Count != (factionsGroups?factions.Count:groups.Count)){//if not the same length, give an error
-						Debug.LogError((factionsGroups?"Factions":"Groups")+" list is not the same length as the number of "
-						+(factionsGroups?"factions":"groups")+" available!");
-				}else{
-				
-					if(factionsGroups)
+		public void ChangeFactionsGroups(bool factionsGroups, List<bool> toChange){
+			if((factionsGroups && controller.factions.enabled) || (!factionsGroups && controller.groups.enabled)){//only need to make changes if enabled
+				if(toChange.Count != (factionsGroups?factions.Count:groups.Count)){//if not the same length, give an error
+					Debug.LogError((factionsGroups?"Factions":"Groups")+" list is not the same length as the number of "
+					+(factionsGroups?"factions":"groups")+" available!\nThe changes have not been applied.");
+					return;//return here so dont get an error later
+			}//end if problem with input
+							
+				if(factionsGroups)//make the changes
 					factions = toChange;
-					else
+				else
 					groups = toChange;
 					
-					controller.GetClosest();//update the closest posts array for trading
-					controller.SortTraderDestination(this);//sort out any traders enroute to this trade post
-				}//else make changes
-				}//end if factions enabled
-				}//end ChangeFactionsGroups
+				controller.GetClosest();//update the closest posts array for trading
+				controller.SortTraderDestination(this);//sort out any traders enroute to this trade post
+			}//end if factions enabled
+		}//end ChangeFactionsGroups
 				
 		public void MovedPost()
 		{//called when the post has been moved

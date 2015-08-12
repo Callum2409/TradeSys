@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -21,8 +21,6 @@ namespace TradeSys
 				public string[][] manufactureNames;//an array with the names of each manufacturing process
 				public string[][] manufactureTooltips;//an array of strings with the tooltip for the manufacturng processes
 		#endif
-		
-				public string[] text;
 	
 		#region used variables
 		#region in editor
@@ -42,6 +40,7 @@ namespace TradeSys
 				public float purchasePercent = 0.7f;//used for the prices of items when the trade post is buying
 				public bool priceUpdates;//if true, will update the price after purchasing each item, so prices may increase / decrease while traders purchase
 				public bool randomPost = true;//if there are no trades from the current post, go to a random post, or find the best
+				public ExpendableList expTraders;//the different types of expendable trader that can be selected
 	
 				public int pauseOption = 0;	//the selected pause option
 				public float pauseTime;//the time to pause for
@@ -70,7 +69,7 @@ namespace TradeSys
 				Distances[][] closest;//this is the closest x number of posts, which are used to work out trader targets
 	
 				int tradePostCount;//these are used so that the length of the array does not need to be used each time
-				int traderCount;
+				internal int traderCount;
 				Trade[] tradeLists;//this contains all of the buy and sell items at each trade post
 				//needmake has this info, so uses that instead of a new class
 		#endregion
@@ -97,6 +96,9 @@ namespace TradeSys
 										}//end for all items
 								}//end for goods groups
 						}//end if need to sort crates
+						
+						if(expTraders.enabled)//if expendable, set the profit weight to be 0
+						profitWeight = 0;
 				}//end Start
 				
 				float CalcDistance (GameObject tp1, GameObject tp2)
@@ -131,16 +133,25 @@ namespace TradeSys
 								postDistances [t] = new float[tradePostCount];
 								tradeLists [t] = new Trade ();
 						}//end for initialisation distances and trade lists
-		
+						
 						for (int t = 0; t<traderCount; t++) {//need to add all of the trader scripts, and get the starting postID
 								Trader trader = traderScripts [t];
 								int postID = GetPostID (trader.target);
-								trader.postID = postID;
+								trader.postID = trader.homeID = postID;
 								trader.startPost = trader.finalPost = postScripts [postID];
 						}//end go through traders
-		
-						#region get distances
-						//now needs to go through and get all of the distances between all of the posts, where they are in the same group and faction
+						
+						if(!expTraders.enabled){//if expendable, check not null
+			for (int t = 0; t<expTraders.traders.Count; t++) {//go through all expendable and check arent null
+				if (expTraders.traders [t] == null) {//check if null
+					Debug.LogError ("One or more expendable traders have been set to null");
+					break;
+				}//end if null						
+			}//end for all expendable
+			}//end if expendable
+			
+			#region get distances
+			//now needs to go through and get all of the distances between all of the posts, where they are in the same group and faction
 						for (int p = 0; p<tradePostCount; p++)//go through the posts
 								SingleDist (p, p);
 						#endregion
@@ -149,8 +160,9 @@ namespace TradeSys
 
 						//Now needs to call other methods
 						Average ();
-						for (int p = 0; p<tradePostCount; p++)
-								postScripts [p].UpdatePrices ();
+						if (!expTraders.enabled)//only update the prices if not expendable
+								for (int p = 0; p<tradePostCount; p++)
+										postScripts [p].UpdatePrices ();
 						InvokeRepeating ("UpdateMethods", 0, updateInterval);
 				}//end GenerateDistances
 	
@@ -314,18 +326,21 @@ namespace TradeSys
 						for (int p = 0; p< tradePostCount; p++) { //set updates to false, so only the required prices are updated and only once
 								postScripts [p].updated = false;//set to false so that prices can be updated if necessary
 								postScripts [p].ManufactureCheck ();//call the manufacturing methods in the trade post
-						}
-						for (int t = 0; t<traderCount; t++)
-								traderScripts [t].ManufactureCheck ();
-								
-						TradeCall ();//call the TradeCall method, to tell traders where to go
+						}//end for all posts
+							
+						if (expTraders.enabled)
+								ExpendableCall ();//call the expendable trader method to tell where to make expendable traders go
+						else	
+								TradeCall ();//call the TradeCall method, to tell traders where to go
 				}//end UpdateMethods
 				
 				public void SortAll ()
 				{//sort out all trade posts and traders
 						//only do this if not in the editor
 						GetPostScripts ();
-						GetTraderScripts ();
+						
+						if (!expTraders.enabled)//if not expendable, get the trader scripts
+								GetTraderScripts ();
 				
 						SortTradePosts ();
 						SortTraders ();
@@ -505,98 +520,133 @@ namespace TradeSys
 	
 				void TradeCall ()
 				{//go through all of the traders, checking the nearest posts and working out the best to go to
-						int count = 0;
 						for (int t = 0; t<traderCount; t++) {//go through all of the traders
 								Trader trader = traderScripts [t];
-								if (!trader.onCall) {//check that the trader is not already doing something
-										count++;
-										int traderPostID = trader.postID;
-										UpdateLists (traderPostID);//update the buy and sell lists for closest posts
-										List<TradeInfo> trades = BestTrade (traderPostID, t);//find the best trades
-				
-										if (trades != null) {//needs to check that there is a trade that it can do
-												TradePost post = postScripts [traderPostID];//the trade post that the trader is currently at
-				
-												float totalTime = 0;//this is the time that the trader needs to pause for if pause option set to cargo mass (specific)
-				
-												for (int c = 0; c<trades.Count; c++) {//go through all of the cargo trades, adding as many as possible to the trader cargo
-														TradeInfo cTrade = trades [c];//the current trade
-														Goods cGood = goods [cTrade.groupID].goods [cTrade.itemID];//the current good
-														double mass = cGood.mass;//the mass of the good
-														Stock stock = post.stock [cTrade.groupID].stock [cTrade.itemID];//the stock
-														int price = stock.price;//the price of the item
-						
-														//need to check quantity again because are loading more than one type of item, and quantity was based on full loads
-														int quantity = Mathf.Min ((int)System.Math.Floor (trader.spaceRemaining / mass), cTrade.quantity,
-							Mathf.FloorToInt (trader.cash / price));
-						
-														if (quantity > 0) {//check that adding cargo														
-																trader.items [cTrade.groupID].items [cTrade.itemID].number += quantity;//add to cargo
-																trader.spaceRemaining -= quantity * mass;//remove the space at the start, if cant afford, space and quantity updated at end
-																totalTime += quantity * cGood.pausePerUnit;//multiply the time by the quantity
-																
-																for (int q = 0; q<quantity; q++) {//add the quantity individually
-																		if (trader.cash >= price) {
-																				//make sure that the trader can afford to buy more items
-																				stock.number --;//remove single item of stock
-																				trader.cash -= price;//pay for the items
-																				post.cash += price;//give the money to the trade post
-																				if (priceUpdates)//if updating the price after each item
-																						post.UpdateSinglePrice (cTrade.groupID, cTrade.itemID);
-																		} else {//trader cannot afford to pay
-																				//this is unlikely to be called, but there is still the slight possiblity that the changes in prices mean that the
-																				//trader can no longer afford all of the items
-																				int unable = quantity - q;//the number of items that the trader was unable to purchase
-																				trader.spaceRemaining += unable * mass;//give the space remaining back
-																				trader.items [cTrade.groupID].items [cTrade.itemID].number -= unable;//reduce the number carried
-																				totalTime -= unable * cGood.pausePerUnit;//reduce the pause time
-																				break;
-																		}//end else can't afford
-																}//end for all items to add
-														}//check enough space remaining
-						
-														if (trader.spaceRemaining == 0)//if no space left, break as no point continuing
-																break;
-														//still continues through loop if there is some space left because may be smaller items to be added
-												}//end for all cargo trades
-												post.UpdatePrices ();//update the prices at the trade post
-																					
-												trader.onCall = true;//set the trader to be doing something, so will not be given new trades
-												trader.startPost = trader.finalPost;//set the starting post to the post it is at
-												trader.finalPost = postScripts [trades [0].postID];//set the final post to the TradePost script to make it easier when trader gets there
-												trader.target = trader.finalPost.gameObject;//set the target to the trade post game object
-												trader.postID = trades [0].postID;//set the postID
-												StartCoroutine (trader.PauseExit (totalTime));//now pause
-										} else {//if no trades, then needs to move
-												if (randomPost) {//if random posts selected, go to a random post in the closest
-														if (CheckTraderFaction (trader, postScripts [traderPostID])) {//check that the trader is in the same faction as the trade post in the first place
-																Distances[] reachable = System.Array.FindAll<Distances> (closest [traderPostID], x => (x.post != -1) && CheckTraderFaction (trader, postScripts [x.post]) && 
-																		CheckFactionsGroups (postScripts [traderPostID], postScripts [x.post]) && postScripts [x.post].allowTrades);//get all of the reachable posts
-																//make the reachable array up of posts that are possible to get to, by making sure not -1 and in the same faction
-																if (reachable.Length == 0) {
-																		Debug.LogError (trader.name + " has no reachable posts! This may be due to incorrect factions or groups");
-																		break;
-																}
-																int selectedPost = reachable [Random.Range (0, reachable.Length)].post;
-																trader.onCall = true;//set to true, so will not be told other posts
-																trader.startPost = trader.finalPost;//set the starting post to the post it is at
-																trader.finalPost = postScripts [selectedPost];//set the final post
-																trader.target = trader.finalPost.gameObject;//set the target gameobject
-																trader.postID = selectedPost;//set the postID
-																StartCoroutine (trader.PauseExit (0));//now pause
-														} else//end check in the same faction as the trader
-																Debug.LogError (trader.name + " is not in the same faction as the starting trade post, so is not able to make any trades ");
-												} else {//else needs to work out which post to go to
-														//needs to go through all of the closest reachable posts, and find which has the best trade
-														//done by following the best trade and update methods from this, and adding the best trades into another array
-														//compare this best of the best array, and then select the destination post
-												}//end else find post
-										}//end else move
-								}//end check not already trading
+								if (!trader.onCall)//check that the trader is not already doing something
+										TraderSet (trader);
 						}//end for traders
 				}//end TradeCall
+				
+				void ExpendableCall ()
+				{//called if expendable traders. tells traders where to go
+						if (expTraders.traders.Count == 0) {//if no expendable traders selected
+								Debug.LogError ("Traders must be added to the list in order to have expendable traders");
+								return;
+						}//end if no expendable traders						
+			
+						while (traderCount < expTraders.maxNoTraders || expTraders.maxNoTraders == 0) {//while can make more traders
+								int postID = Random.Range (0, tradePostCount);//pick a trade post
+								Trader trader = (Trader)Instantiate (expTraders.traders [Random.Range (0, expTraders.traders.Count)], 
+									tradePosts [postID].transform.position, Quaternion.identity);//make the trader and get the script
+								trader.transform.parent = transform;//set the parent to be the controller
+								trader.postID = trader.homeID = postID;//set the post ids
+								trader.startPost = postScripts [postID];//set the start post straight away
+				
+								traderCount++;//increase the trader count
+				
+								if (!TraderSet (trader))//set the trader and check is ok
+										break;//break until next time if the trader isnt going anywhere
+						}//end while make more traders			
+				}//end ExpendableCall
+				
+				bool TraderSet (Trader trader)
+				{//find the best trades etc for the given trader
+						//is a bool because if is expendable, it may end up going through the posts an infinite number of times, so returns false if a trader could not be set so wont lock up
+						int traderPostID = trader.postID;
+						UpdateLists (traderPostID);//update the buy and sell lists for closest posts
+						List<TradeInfo> trades = BestTrade (traderPostID, trader);//find the best trades
+			
+						if (trades != null) {//needs to check that there is a trade that it can do
+								TradePost post = postScripts [traderPostID];//the trade post that the trader is currently at
+				
+								float totalTime = 0;//this is the time that the trader needs to pause for if pause option set to cargo mass (specific)
+				
+								for (int c = 0; c<trades.Count; c++) {//go through all of the cargo trades, adding as many as possible to the trader cargo
+										TradeInfo cTrade = trades [c];//the current trade
+										Goods cGood = goods [cTrade.groupID].goods [cTrade.itemID];//the current good
+										double mass = cGood.mass;//the mass of the good
+										Stock stock = post.stock [cTrade.groupID].stock [cTrade.itemID];//the stock
+										int price = stock.price;//the price of the item
+					
+										//need to check quantity again because are loading more than one type of item, and quantity was based on full loads
+										int quantity = Mathf.Min ((int)System.Math.Floor (trader.spaceRemaining / mass), cTrade.quantity);
+										
+										if (!expTraders.enabled)//if not expendable, also check the prices for min quantity
+												quantity = Mathf.Min (quantity, Mathf.FloorToInt (trader.cash / price));//check the price one here as is not expendable
+					
+										if (quantity > 0) {//check that adding cargo														
+												trader.items [cTrade.groupID].items [cTrade.itemID].number += quantity;//add to cargo
+												trader.spaceRemaining -= quantity * mass;//remove the space at the start, if cant afford, space and quantity updated at end
+												totalTime += quantity * cGood.pausePerUnit;//multiply the time by the quantity
+						
+												for (int q = 0; q<quantity; q++) {//add the quantity individually
+														if (trader.cash >= price || expTraders.enabled) {
+																//make sure that the trader can afford to buy more items or is expendable so doesnt matter
+																stock.number --;//remove single item of stock
+																
+																if (!expTraders.enabled) {//only sort cash if not expendable
+																		trader.cash -= price;//pay for the items
+																		post.cash += price;//give the money to the trade post
+																		if (priceUpdates)//if updating the price after each item
+																				post.UpdateSinglePrice (cTrade.groupID, cTrade.itemID);
+																}//end if not expendable, sort cash
+														} else {//trader cannot afford to pay
+																//this is unlikely to be called, but there is still the slight possiblity that the changes in prices mean that the
+																//trader can no longer afford all of the items
+																int unable = quantity - q;//the number of items that the trader was unable to purchase
+																trader.spaceRemaining += unable * mass;//give the space remaining back
+																trader.items [cTrade.groupID].items [cTrade.itemID].number -= unable;//reduce the number carried
+																totalTime -= unable * cGood.pausePerUnit;//reduce the pause time
+																break;
+														}//end else can't afford
+												}//end for all items to add
+										}//check enough space remaining
+					
+										if (trader.spaceRemaining == 0)//if no space left, break as no point continuing
+												break;
+										//still continues through loop if there is some space left because may be smaller items to be added
+								}//end for all cargo trades
+								post.UpdatePrices ();//update the prices at the trade post
+				
+								trader.onCall = true;//set the trader to be doing something, so will not be given new trades
+								trader.startPost = trader.finalPost;//set the starting post to the post it is at
+								trader.finalPost = postScripts [trades [0].postID];//set the final post to the TradePost script to make it easier when trader gets there
+								trader.target = trader.finalPost.gameObject;//set the target to the trade post game object
+								trader.postID = trades [0].postID;//set the postID
+								StartCoroutine (trader.PauseExit (totalTime));//now pause
+						} else {//if no trades, then needs to move or be deleted
+								if (expTraders.enabled) {//if expendable and have got here, delete the trader
+										trader.DestroyTrader ();
+										return false;//return so dont need to do anything else
+								}//end if expendable
+								if (trader.tradeType > 0) {//if is depot and nothing to take
+										SendToPost (trader, trader.homeID);//send the trader back to the depot
+										return false;//return so doesnt do the random post bit
+								}//end if depot
+				
+								if (randomPost) {//if random posts selected, go to a random post in the closest
+										if (CheckTraderFaction (trader, postScripts [traderPostID])) {//check that the trader is in the same faction as the trade post in the first place
+												Distances[] reachable = System.Array.FindAll<Distances> (closest [traderPostID], x => (x.post != -1) && CheckTraderFaction (trader, postScripts [x.post]) && 
+														CheckFactionsGroups (postScripts [traderPostID], postScripts [x.post]) && postScripts [x.post].allowTrades);//get all of the reachable posts
+												//make the reachable array up of posts that are possible to get to, by making sure not -1 and in the same faction
+												if (reachable.Length == 0) {
+														Debug.LogError (trader.name + " has no reachable posts! This may be due to incorrect factions or groups");
+														return false;
+												}
+												SendToPost (trader, reachable [Random.Range (0, reachable.Length)].post);//send the trader to the post
+						
+										} else//end check in the same faction as the trader
+												Debug.LogError (trader.name + " is not in the same faction as the starting trade post, so is not able to make any trades ");
+								} else {//else needs to work out which post to go to
+										//needs to go through all of the closest reachable posts, and find which has the best trade
+										//done by following the best trade and update methods from this, and adding the best trades into another array
+										//compare this best of the best array, and then select the destination post
+								}//end else find post
+						}//end else move
+						return true;
+				}//end TraderSet
 	
-				int GetPostID (GameObject post)
+				public int GetPostID (GameObject post)
 				{//find out which index in the arrays the target post is
 						for (int p = 0; p<tradePostCount; p++)//go through trade posts
 								if (tradePosts [p] == post)//check if the same
@@ -664,22 +714,31 @@ namespace TradeSys
 						
 				}//end UpdateLists
 	
-				List<TradeInfo> BestTrade (int postID, int traderID)
+				List<TradeInfo> BestTrade (int postID, Trader trader)
 				{//go through the closest posts, finding the most profitable which is in sell at current and buy at next
 						//gets the distance, and uses the different weightings to decide which is the best post
 						List<BuySell> sell = tradeLists [postID].sell;//the sell list
 						List<BuySell> intersect = new List<BuySell> ();//this is the list containing all of the items which are found in both lists
 						List<TradeInfo> trades = new List<TradeInfo> ();
 
+						int tradeType = trader.tradeType;//get the trade type so that can check if depot
+						int homeID = trader.homeID;//get the homeID of the trader
+						
+						if (tradeType == 2 && postID != homeID)//if is return with no backhaul
+								return null;//then return null so jumps straight to the return home						
+						
 						for (int p = 0; p<closestPosts; p++) {//go through closest posts
 								int currentPostID = closest [postID] [p].post;
-								if (currentPostID != -1 && CheckTraderFaction (traderScripts [traderID], postScripts [currentPostID]) && postScripts [currentPostID].allowTrades && CheckFactionsGroups (postScripts [postID], postScripts [currentPostID])) {
+								
+								if ((tradeType == 0 || postID == homeID || currentPostID == homeID) && 
+								//check if not depot, check if already at home, check if cargo heading home
+										currentPostID != -1 && CheckTraderFaction (trader, postScripts [currentPostID]) && postScripts [currentPostID].allowTrades && CheckFactionsGroups (postScripts [postID], postScripts [currentPostID])) {
 										//check not -1, so can actually get to the trade post, and check that they are in the same faction, check that trading is allowed, and check that faction and group of posts is similar
 										intersect = sell.Intersect (tradeLists [currentPostID].buy).ToList ();
 										for (int i = 0; i<intersect.Count; i++) {//go through all items in intersect
 												BuySell cI = intersect [i];
-												if (traderScripts [traderID].items [cI.groupID].items [cI.itemID].enabled) {//check that the trader is allowed to take the cargo
-														int quantity = TradeQuantity (postID, currentPostID, cI.groupID, cI.itemID, traderID);
+												if (trader.items [cI.groupID].items [cI.itemID].enabled) {//check that the trader is allowed to take the cargo
+														int quantity = TradeQuantity (postID, currentPostID, cI.groupID, cI.itemID, trader);
 					
 														if (quantity > 0) {//only work out profit and add if there is more than one to trade		
 																int profit = (postScripts [currentPostID].stock [cI.groupID].stock [cI.itemID].price * quantity) -
@@ -699,8 +758,9 @@ namespace TradeSys
 						return null;//retun null if no trades available
 				}//end BestTrade
 	
-				int TradeQuantity (int c, int t, int gID, int iID, int traderID)
-				{//the IDs of the current and target posts and groupID and itemID//work out the quantity that should be traded
+				int TradeQuantity (int c, int t, int gID, int iID, Trader trader)
+				{//the IDs of the current and target posts and groupID and itemID
+						//work out the quantity that should be traded
 						Goods good = goods [gID].goods [iID];
 						float avg = (float)good.average;
 						Stock cP = postScripts [c].stock [gID].stock [iID];//the stock at the current post
@@ -708,9 +768,21 @@ namespace TradeSys
 						int buyQuantity = Mathf.RoundToInt (avg - (postScripts [t].stock [gID].stock [iID].number * buyMultiple));
 						//will now return the minimum of the buy and sell quantities, the number that can fit in the cargo space, 
 						//and the number that the trader can purchase, and the number that the trade post can purchase
-						return (int)Mathf.Min (sellQuantity, buyQuantity, (float)(traderScripts [traderID].spaceRemaining / good.mass), 
-				Mathf.FloorToInt (traderScripts [traderID].cash / cP.price), Mathf.FloorToInt (postScripts [t].cash / (postScripts [t].stock [gID].stock [iID].price * purchasePercent)));
+						int quantity = (int)Mathf.Min (sellQuantity, buyQuantity, (float)(trader.spaceRemaining / good.mass));
+						if (!expTraders.enabled)//if expendable, do more calculations
+								quantity = (int)Mathf.Min (quantity, Mathf.FloorToInt (trader.cash / cP.price), Mathf.FloorToInt (postScripts [t].cash / (postScripts [t].stock [gID].stock [iID].price * purchasePercent)));
+						return quantity;
 				}//end TradeQuantity
+				
+				void SendToPost (Trader trader, int postID)
+				{//send a trader to a post empty
+						trader.onCall = true;//set to true, so will not be told other posts
+						trader.startPost = trader.finalPost;//set the starting post to the post it is at
+						trader.finalPost = postScripts [postID];//set the final post
+						trader.target = trader.finalPost.gameObject;//set the target gameobject
+						trader.postID = postID;//set the postID
+						StartCoroutine (trader.PauseExit (0));//now pause
+				}//end SendToPost
 	
 				public void OnDrawGizmos ()
 				{//if show lines enabled, draw trade lines between the posts
@@ -787,7 +859,10 @@ namespace TradeSys
 				}//end EditProcess
 				
 				public void SortTraderDestination (TradePost target)
-				{//if the factions, groups or trade options are changed, need to sort out traders enroute				
+				{//if the factions, groups or trade options are changed, need to sort out traders enroute
+						if (expTraders.enabled)
+								GetTraderScripts ();//get the traderscripts as they will need updating now
+										
 						for (int t = 0; t<traderCount; t++) {//go through all traders
 								Trader trader = traderScripts [t];//get the current trader
 						
@@ -802,6 +877,8 @@ namespace TradeSys
 				
 				public void TraderAllHome (int postID)
 				{//send any traders back to the start post if it is heading for the selected post
+						if (expTraders.enabled)
+								GetTraderScripts ();//get the traderscripts as they will need updating now
 						for (int t = 0; t<traderCount; t++) {//go through all traders
 								if (traderScripts [t].postID == postID)//if target post is one which has been edited
 										TraderHome (traderScripts [t]);//send back home
@@ -839,6 +916,9 @@ namespace TradeSys
 								if (postScripts [p].postID > postID)//if the ID is greater than the one being deleted, decrease
 										postScripts [p].postID--;//decrease the postID by one
 						}//end for all posts
+						
+						if (expTraders.enabled)
+								GetTraderScripts ();//get the traderscripts as they will need updating now
 			
 						for (int t = 0; t<traderCount; t++) {//go through all traders
 								if (traderScripts [t].postID > postID)//if the postID is greater, decrease by one

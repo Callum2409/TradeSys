@@ -96,12 +96,13 @@ public class TSTraderAI : MonoBehaviour
 				tS.allowGo = true;//trader can now continue
 		
 				if (target != null) {
-		
 						TradeSys.Item iS = target.GetComponent<TradeSys.Item> ();//get the item script
+						if(iS != null){//check if null as it may have been collected
 						tS.items [iS.groupID].items [iS.itemID].number += iS.number;//increase the number being carreid
 						tS.spaceRemaining -= iS.number * controller.goods [iS.groupID].goods [iS.itemID].mass;//decrease the cargo space remaining
 						
 						iS.Collected ();//IMPORTANT - need to say that the item has been collected so the spawner count can be updated
-				}
+						}//end if not null
+				}//end if target not null
 		}//end CollectItem
 }//end TSTraderAI

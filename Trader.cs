@@ -12,6 +12,7 @@ namespace TradeSys
 				public GameObject target;//the current target of the trader
 				public TradePost startPost, finalPost;//the final post where the trader will end up
 				public int postID;//the ID of the current post
+				public int homeID;//the ID of the starting post of the trader
 				public bool onCall;//true if the trader has been given a destination post
 				public bool allowGo = false;//whether the trader is allowed to move or not
 				public bool allowCollect;//whether the trader is allowed to collect dropped items
@@ -23,12 +24,17 @@ namespace TradeSys
 				public List<ItemGroup> items = new List<ItemGroup> ();//a list where it is possible to select what a trader can and can't carry
 				public List<bool> factions = new List<bool> ();//select which factions the trader belongs to
 				public List<MnfctrGroup> manufacture = new List<MnfctrGroup> ();//manufacturing lists
+				public int tradeType = 0;//0 - standard, 1 - depot backhaul, 2 - depot no backhaul
+				public bool dropCargo;//whether cargo can be dropped or not
+				public bool dropSingle;//whether a single item is dropped at a time or all of one item in a crate
 
 				void Awake ()
 				{
 						controller = GameObject.FindGameObjectWithTag (Tags.C).GetComponent<Controller> ();
 						tag = Tags.T;
 						spaceRemaining = cargoSpace;//set the space remaining to be the same as the cargo space, because have no cargo
+						
+			InvokeRepeating ("ManufactureCheck", 0, controller.updateInterval);//check for manufacture changes periodically. do this here so expendables can do it too
 				}//end Awake
 	
 				public IEnumerator AtPost ()
@@ -45,14 +51,17 @@ namespace TradeSys
 						//next is done to make sure that the post is able to afford all of the items
 						while(number > 0){//if has more than 0 
 							int cost = Mathf.RoundToInt (stock.price * controller.purchasePercent);
-							if (finalPost.cash >= stock.price * controller.purchasePercent) {//if has enough money to buy the item
+							if (finalPost.cash >= stock.price * controller.purchasePercent || controller.expTraders.enabled) {//if has enough money to buy the item
 								number --;//remove stock from hold
 								spaceRemaining += cGood.mass;//increase space remaining								
 								stock.number++;//add to trade post
+								
+								if(!controller.expTraders.enabled){//only need to sort prices if not expendable
 								finalPost.cash -= cost;//pay for item
 								cash += cost;//receive money
 								if (controller.priceUpdates)//if update after each trade
 									finalPost.UpdateSinglePrice (g, i);//update the price
+									}//end not expendable so sort prices
 							} else//end if enough cash
 								break;//if no more cash, then break from this while loop for loop will continue to make sure that as many items
 							//as possible are sold
@@ -63,6 +72,9 @@ namespace TradeSys
 								}//end post buy check
 							}//end for items
 						}//end for group
+						
+						if(controller.expTraders.enabled)//if expendable
+						DestroyTrader();//destroy the trader
 	
 						if (controller.pauseEnter)//if entry pause
 								yield return StartCoroutine (Pause (controller.pauseOption < 2 ? stopTime : totalTime));//pause of stop time, else the total time
@@ -84,6 +96,7 @@ namespace TradeSys
 				
 		public void ManufactureCheck ()
 		{//go through the manufacturing processes, and if not being made, check that can
+		if(!controller.expTraders.enabled){//if expendable, dont manufacture anything
 				for (int m1 = 0; m1<manufacture.Count; m1++) {//go through manufacture groups
 					for (int m2 = 0; m2<manufacture[m1].manufacture.Count; m2++) {//go through manufacture processes
 						RunMnfctr cMan = manufacture [m1].manufacture [m2];
@@ -95,6 +108,7 @@ namespace TradeSys
 						}//end if running
 					}//end for manufacture processes
 				}//end for manufacture groups
+				}//end if not expendable
 		}//end Manfuacture Check
 		
 		bool ResourceCheck (int groupID, int processID)
@@ -169,5 +183,71 @@ namespace TradeSys
 		{
 			controller.EditProcess (manufacture, manufactureGroup, processNumber, enabled, createTime, cooldownTime);
 		}//end EditProcess
+		
+		public void ChangeTradeHome(GameObject post){//used to change which trade post appears as the home post. Only useful for depots
+			homeID = controller.GetPostID(post);
+		}//end ChangeTradeHome
+		
+		public void ChangeTradeHome(TradePost post){//used to change which trade post appears as the home post. Only useful for depots
+			homeID = controller.GetPostID(post.gameObject);
+		}//end ChangeTradeHome
+		
+		public void ChangeFactions(List<bool> newFactions){//change the factions that the trader belongs to
+			if(newFactions.Count != factions.Count){//if not the same length, show error
+				Debug.LogError("The entered factions list is not the same as the number of factions available!\nThe changes have not been applied.");
+				return;//return here so no errors later
+			}//end if not same length
+			
+			if(controller.CheckTraderFaction(this, finalPost))//check that the final post is in the home faction, if it is, make changes
+				factions = newFactions;//make changes
+			else if(controller.CheckTraderFaction(this, startPost)){//if final post not same faction, check that the start post is
+				factions = newFactions;//make changes
+				controller.TraderHome(this);//send the trader back home as the factions have changed
+			}else//end start post faction check
+				Debug.LogWarning("The factions have not been changed as neither the final or the start post share the same factions as the trader.");
+		}//end ChangeFactions
+		
+		public void DestroyTrader(){//destroy the trader
+		//this will get called by expendable trader methods but can be used to remove the trader from the game
+			if(controller.expTraders.enabled)//if expendable
+				controller.traderCount--;//reduce the number of traders by one
+			else
+				controller.GetTraderScripts();//else needs to update the list of trader scripts
+		
+			DropAllCargo();//drop all carried cargo
+		
+			Destroy(gameObject);//destroy the game object. replace this with pooling etc for efficiency
+		}//end DestroyTrader
+		
+		public void DropAllCargo(){//drop all of the cargo. is used here so can be called when destroyed, but could be used for jetissoing all cargo
+			for(int g = 0; g<items.Count; g++){//for all groups
+				for(int i = 0; i<items[g].items.Count; i++){//for all items
+					int number = items[g].items[i].number;//the number of the item
+					
+					if(number > 0){//if there is cargo to drop
+					if(dropCargo){//check can drop cargo
+						if(dropSingle)//if needing to drop a single item
+							for(int n = 0; n<number; n++)
+								DropCargo(1, g, i);//drop the cargo
+						else
+							DropCargo(number, g, i);//else drop all at once
+							}else//end check drop cargo
+							controller.UpdateAverage(g, i, number, 0);//needs to update the average						
+					}//end if dropping cargo
+				}//end for all items
+			}//end for all groups
+		}//end DropAllCargo
+		
+		public void DropCargo(int number, int groupID, int itemID){//drop the number of cargo
+			if(dropCargo){//if allowed to drop cargo
+			Item droppedItem = (Item)Instantiate(controller.goods[groupID].goods[itemID].itemCrate, transform.position, Quaternion.identity);//create the item
+			//set the details of the dropped item
+			droppedItem.groupID = groupID;
+			droppedItem.itemID = itemID;
+			droppedItem.number = Mathf.Min(number, items[groupID].items[itemID].number);//drop the min number
+			droppedItem.traderCollect = true;
+			droppedItem.dropped = true;
+				}//end if can drop cargo
+		}//end DropCargo
 	}//end Trader
 }//end namespace

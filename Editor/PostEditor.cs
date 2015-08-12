@@ -34,6 +34,8 @@ namespace TradeSys
 				private SerializedProperty tags, groups, factions;
 				private SerializedProperty stopProcesses;
 				private SerializedProperty allowTrades, allowMan;
+				
+				bool expendable;
 		#endregion
 	
 				void OnEnable ()
@@ -63,14 +65,16 @@ namespace TradeSys
 						factions = postSO.FindProperty ("factions");	
 		
 						stopProcesses = postSO.FindProperty ("stopProcesses");
-						allowTrades = postSO.FindProperty("allowTrades");
-						allowMan = postSO.FindProperty("allowManufacture");
+						allowTrades = postSO.FindProperty ("allowTrades");
+						allowMan = postSO.FindProperty ("allowManufacture");
 		
 						GUITools.GetNames (controllerNormal);
 						GUITools.ManufactureInfo (controllerNormal);
 						
-						if(!Application.isPlaying)//only do this if it isnt playing
-						controllerNormal.SortAll ();
+						expendable = controllerNormal.expTraders.enabled;
+						
+						if (!Application.isPlaying)//only do this if it isnt playing
+								controllerNormal.SortAll ();
 				}//end OnEnable
 	
 				public override void OnInspectorGUI ()
@@ -93,6 +97,7 @@ namespace TradeSys
 				#region settings
 						case 0:
 								EditorGUI.indentLevel = 0;
+								if(controllerNormal.factions.enabled || controllerNormal.groups.enabled)//only have horiz vert if showing factions or groups
 								GUITools.HorizVertOptions (controllerSO.FindProperty ("showHoriz"));//show display options
 			
 								scrollPos.PS = GUITools.StartScroll (scrollPos.PS, smallScroll);
@@ -101,17 +106,20 @@ namespace TradeSys
 								if (GUITools.TitleGroup (new GUIContent ("Options", "Set information about how the trade post works"), controllerSO.FindProperty ("opTP"), false)) {//if showing options
 										EditorGUILayout.PropertyField (showLinks, new GUIContent ("Show trade links", "Show the possible trade links between trade posts"));
 			
-										EditorGUILayout.BeginHorizontal ();
-										EditorGUILayout.PropertyField (customPricing, new GUIContent ("Custom pricing", "Manually set the pricing of each item. Prices will be static"));
-										EditorGUILayout.PropertyField (cash, new GUIContent ("Credits", "This is the amout of money that the trade post has in order to buy and sell items"));
-										EditorGUILayout.EndHorizontal ();
+										if (!expendable) {//show pricing things if not expendable
+												EditorGUILayout.BeginHorizontal ();
+												EditorGUILayout.PropertyField (customPricing, new GUIContent ("Custom pricing", "Manually set the pricing of each item. Prices will be static"));
+												EditorGUILayout.PropertyField (cash, new GUIContent ("Credits", "This is the amout of money that the trade post has in order to buy and sell items"));
+												EditorGUILayout.EndHorizontal ();
+										}else//end if no pricing
+										postNormal.customPricing = false;//set to false so wont display custom pricing
 			
 										EditorGUILayout.PropertyField (postSO.FindProperty ("stopProcesses"), new GUIContent ("Stop processes", "Stop manufacturing processes if it will result in the number of an item going out of the specified range"));
 								
-										EditorGUILayout.BeginHorizontal();
-										EditorGUILayout.PropertyField(allowTrades, new GUIContent("Allow trades", "Select if the trade post is allowed to trade. This will not prevent any options and is so that it can be turned on/off easily"));
-										EditorGUILayout.PropertyField(allowMan, new GUIContent("Allow manufacture", "Select if the trade post is allowed to manufacture. This will not prevent any options and is so that it can be turned on/off easily"));
-										EditorGUILayout.EndHorizontal();
+										EditorGUILayout.BeginHorizontal ();
+										EditorGUILayout.PropertyField (allowTrades, new GUIContent ("Allow trades", "Select if the trade post is allowed to trade. This will not prevent any options and is so that it can be turned on/off easily"));
+										EditorGUILayout.PropertyField (allowMan, new GUIContent ("Allow manufacture", "Select if the trade post is allowed to manufacture. This will not prevent any options and is so that it can be turned on/off easily"));
+										EditorGUILayout.EndHorizontal ();
 								}//end if showing options
 								EditorGUILayout.EndVertical ();
 					#endregion
@@ -140,10 +148,12 @@ namespace TradeSys
 								EditorGUILayout.LabelField ("Stock information", EditorStyles.boldLabel);
 								GUILayout.FlexibleSpace ();
 								
-								if (!customPricing.boolValue)//only show this option if prices are set automatically
+								if (!customPricing.boolValue && !expendable)//only show this option if prices are set automatically and not expendable traders
 										controllerSO.FindProperty ("showPrices").boolValue = GUILayout.Toggle (controllerSO.FindProperty ("showPrices").boolValue, new GUIContent ("Show prices", "Show the prices of the different items. Not editable, and will show 1 or what the custom pricing was set until the game is playing where it will then be set automatically. If the item is marked as hidden, then the price will not be set because it is not required"), "minibuttonleft");
-								
-								GUITools.ExpandCollapse (controllerGoods, "expandedP", !customPricing.boolValue);
+								else
+					controllerSO.FindProperty ("showPrices").boolValue = false;//if expendable or not able to show, set to false
+						
+								GUITools.ExpandCollapse (controllerGoods, "expandedP", !customPricing.boolValue && !expendable);
 								EditorGUILayout.EndHorizontal ();
 			
 								scrollPos.PG = GUITools.StartScroll (scrollPos.PG, smallScroll);
@@ -291,8 +301,8 @@ namespace TradeSys
 																								mi = 0;
 																						else if (mi > ma)
 																								mi = ma;
-																						if(ma < 0)
-																						ma = 0;
+																						if (ma < 0)
+																								ma = 0;
 																						//set min to be > 0 and < max
 									
 																						//set the numbers

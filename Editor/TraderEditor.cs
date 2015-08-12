@@ -33,7 +33,10 @@ namespace TradeSys
 				private SerializedProperty item;
 				private SerializedProperty factions;
 				private SerializedProperty manufacturing;
+				private SerializedProperty dropCargo;
+				private SerializedProperty dropSingle;
 				GameObject[] posts;
+				bool expendable;
 		#endregion
 	
 				void OnEnable ()
@@ -54,18 +57,23 @@ namespace TradeSys
 						cargoSpace = traderSO.FindProperty ("cargoSpace");
 						cash = traderSO.FindProperty ("cash");
 						closeDistance = traderSO.FindProperty ("closeDistance");
-						collect = traderSO.FindProperty("allowCollect");
+						collect = traderSO.FindProperty ("allowCollect");
 		
 						posts = GameObject.FindGameObjectsWithTag (Tags.TP);
 		
 						factions = traderSO.FindProperty ("factions");
 						manufacturing = traderSO.FindProperty ("manufacture");
+						
+						dropCargo = traderSO.FindProperty ("dropCargo");
+						dropSingle = traderSO.FindProperty ("dropSingle");
 	
 						GUITools.GetNames (controllerNormal);
 						GUITools.ManufactureInfo (controllerNormal);
 						
-			if(!Application.isPlaying)//only do this if it isnt playin
-						controllerNormal.SortAll ();
+						expendable = controllerNormal.expTraders.enabled;
+				
+						if (!Application.isPlaying)//only do this if it isnt playin
+								controllerNormal.SortAll ();
 				}//end OnEnable
 	
 				public override void OnInspectorGUI ()
@@ -74,30 +82,30 @@ namespace TradeSys
 						Undo.RecordObject (traderNormal, "TradeSys Trader");
 						EditorGUIUtility.fieldWidth = 30f;
 						#endif	
-			
-						if (PrefabUtility.GetPrefabType (traderNormal.gameObject) == PrefabType.Prefab)//if is prefab, show info to why no options can be set
-								EditorGUILayout.HelpBox ("Nothing here can be edited because this is a prefab."/*\nAllow expendable traders in the controller and add this as one in order to be able to set options"*/, MessageType.Info);
-						else {//else show options because is not a prefab
-								traderSO.Update ();
-								controllerSO.Update ();
+						
+						traderSO.Update ();
+						controllerSO.Update ();
 				
-								sel = GUITools.Toolbar (sel, new string[] {
+						sel = GUITools.Toolbar (sel, new string[] {
 										"Settings",
 										"Items",
 										"Manufacturing"
 								});//show a toolbar
 				
-								switch (sel) {
+						switch (sel) {
 					#region settings
-								case 0:
-										EditorGUI.indentLevel = 0;
+						case 0:
+								EditorGUI.indentLevel = 0;
+								if (controllerNormal.factions.enabled)//only show these options if factions are on
 										GUITools.HorizVertOptions (controllerSO.FindProperty ("showHoriz"));//show display options
 					
-										scrollPos.TS = GUITools.StartScroll (scrollPos.TS, smallScroll);
+								scrollPos.TS = GUITools.StartScroll (scrollPos.TS, smallScroll);
 					
 					
 					#region options
-										if (GUITools.TitleGroup (new GUIContent ("Options", "Set general information for the trader which will affect trading"), controllerSO.FindProperty ("opT"), false)) {//if showing options
+								if (GUITools.TitleGroup (new GUIContent ("Options", "Set general information for the trader which will affect trading"), controllerSO.FindProperty ("opT"), false)) {//if showing options
+												
+										if (!expendable) {//if not expendable, then show target post
 												EditorGUILayout.BeginHorizontal ();
 												if (targetPost.objectReferenceValue == null)//if no target has been selected
 														GUI.color = Color.red;//make it red so is obvious
@@ -142,57 +150,84 @@ namespace TradeSys
 												}//end if set location pressed
 												GUI.enabled = true;
 												EditorGUILayout.EndHorizontal ();
+										}//end if not expendable
 					
-												EditorGUILayout.BeginHorizontal ();
-												EditorGUILayout.PropertyField (closeDistance, new GUIContent ("Close distance", "If the trader is within this distance to a trade post or an item, it will register as being there"));
-						EditorGUILayout.LabelField("");
-						EditorGUILayout.EndHorizontal ();
-												if (closeDistance.floatValue < 0)
-														closeDistance.floatValue = 0;
+										EditorGUILayout.BeginHorizontal ();
+										EditorGUILayout.PropertyField (closeDistance, new GUIContent ("Close distance", "If the trader is within this distance to a trade post or an item, it will register as being there"));
+										EditorGUILayout.LabelField ("");
+										EditorGUILayout.EndHorizontal ();
+										if (closeDistance.floatValue < 0)
+												closeDistance.floatValue = 0;
 					
-												EditorGUILayout.BeginHorizontal ();
-												EditorGUILayout.PropertyField (cargoSpace, new GUIContent ("Cargo space", "This is the amount of space available to the trader"));
+										EditorGUILayout.BeginHorizontal ();
+										EditorGUILayout.PropertyField (cargoSpace, new GUIContent ("Cargo space", "This is the amount of space available to the trader"));
+												
+										if (!expendable)//if not expendable, then show credits
 												EditorGUILayout.PropertyField (cash, new GUIContent ("Credits", "The amount of money that the trader has in order to purchase goods. Make sure that the trader has enough money to be able to make purchases!"));
-												EditorGUILayout.EndHorizontal ();
-												if (cargoSpace.floatValue < 0.000001f)
-														cargoSpace.floatValue = 0.000001f;
+										else
+												EditorGUILayout.LabelField ("");
+												
+										EditorGUILayout.EndHorizontal ();
+										if (cargoSpace.floatValue < 0.000001f)
+												cargoSpace.floatValue = 0.000001f;
 					
-												if (cash.intValue < 0)
-														cash.intValue = 0;
+										if (cash.intValue < 0)
+												cash.intValue = 0;
 														
-						if(controllerNormal.pickUp)//only need to show this if is enabled in the controller
-							EditorGUILayout.PropertyField(collect, new GUIContent("Allow collection", "If enabled, will allow this trader to collect dropped items"));
+										if (controllerNormal.pickUp)//only need to show this if is enabled in the controller
+												EditorGUILayout.PropertyField (collect, new GUIContent ("Allow collection", "If enabled, will allow this trader to collect dropped items"));
 						
-										}//end showing options
-										EditorGUILayout.EndVertical ();
+										if (!expendable) {
+												GUIContent[] types = new GUIContent[] {
+																new GUIContent ("Standard", "The standard trade type where the trader will go from place to place"),
+																new GUIContent ("Depot - backhaul", "The trader will return to a starting post when it has reached its destination. Will try and take cargo back"),
+																new GUIContent ("Depot - no backhaul", "The trader will return to a starting post when it has reached its destination. Will not try and take cargo back")
+														};//end different types
+														
+												traderNormal.tradeType = EditorGUILayout.Popup (new GUIContent ("Trade type", "Select the trading type"), traderNormal.tradeType, types, "DropDownButton");
+										}//end if not expendable
+						
+										if (controllerNormal.pickUp) {//only need to show this if is enabled in the controller
+												if (dropCargo.boolValue)
+														EditorGUILayout.BeginHorizontal ();
+						
+												EditorGUILayout.PropertyField (dropCargo, new GUIContent ("Drop cargo", "When the trader is destroyed (see manual), drop the cargo in cargo crates"));
+						
+												if (dropCargo.boolValue) {
+														EditorGUILayout.PropertyField (dropSingle, new GUIContent ("Same crate", "If selected, will drop all of a single item in the same crate. If disabled, each individual item will have its own crate"));
+														EditorGUILayout.EndHorizontal ();
+												}//end if drop cargo selected
+										}//end if allow pickup
+						
+								}//end showing options
+								EditorGUILayout.EndVertical ();
 					#endregion
 					#region factions
-										if (controllerNormal.factions.enabled)//check that the factions have been enabled before showing anything
-												GUITools.TGF (controllerNormal, controllerSO, "expandedT", new GUIContent ("Factions", "Select which factions the trader belongs to. In order to be able to trade with a trade post, they both have to have a faction in common"), factions, true, new string[]{}, "factions", "factions");
+								if (controllerNormal.factions.enabled)//check that the factions have been enabled before showing anything
+										GUITools.TGF (controllerNormal, controllerSO, "expandedT", new GUIContent ("Factions", "Select which factions the trader belongs to. In order to be able to trade with a trade post, they both have to have a faction in common"), factions, true, new string[]{}, "factions", "factions");
 					#endregion
-										break;
+								break;
 					#endregion
 					
 					#region items
-								case 1:
-										scrollPos.TG = GUITools.EnableDisableItems ("Allow item trade", "expandedT", scrollPos.TG, controllerSO, traderSO.FindProperty ("items"), smallScroll, controllerNormal);
-										break;
+						case 1:
+								scrollPos.TG = GUITools.EnableDisableItems ("Allow item trade", "expandedT", scrollPos.TG, controllerSO, traderSO.FindProperty ("items"), smallScroll, controllerNormal);
+								break;
 					#endregion
 					
 					#region manufacturing
-								case 2:
-										scrollPos.TM = GUITools.PTMan (manufacturing, scrollPos.TM, smallScroll, controllerSO.FindProperty ("manufacture"), controllerNormal, traderSO, false);
-										break;
+						case 2:
+								scrollPos.TM = GUITools.PTMan (manufacturing, scrollPos.TM, smallScroll, controllerSO.FindProperty ("manufacture"), controllerNormal, traderSO, false);
+								break;
 					#endregion
-								}//end switch	
+						}//end switch	
 					
-								if (smallScroll.boolValue)//if small scroll enabled, then end the scroll view
-										EditorGUILayout.EndScrollView ();							
+						if (smallScroll.boolValue)//if small scroll enabled, then end the scroll view
+								EditorGUILayout.EndScrollView ();							
 		
-								traderSO.ApplyModifiedProperties ();
-								controllerSO.ApplyModifiedProperties ();
-								controllerNormal.selected.T = sel;
-						}//end else not a prefab
+						traderSO.ApplyModifiedProperties ();
+						controllerSO.ApplyModifiedProperties ();
+						controllerNormal.selected.T = sel;
 				}//end OnInspectorGUI
 		}//end TraderEditor
 }//end namespace
