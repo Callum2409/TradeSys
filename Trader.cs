@@ -27,6 +27,7 @@ namespace TradeSys
 				void Awake ()
 				{
 						controller = GameObject.FindGameObjectWithTag (Tags.C).GetComponent<Controller> ();
+						tag = Tags.T;
 						spaceRemaining = cargoSpace;//set the space remaining to be the same as the cargo space, because have no cargo
 				}//end Awake
 	

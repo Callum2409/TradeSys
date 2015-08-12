@@ -21,7 +21,6 @@ namespace TradeSys {//use namespace to stop any name conflicts
 			#region posts
 			for (int n = 0; n<numberOfPosts; n++) {//add new posts, setting them up   
 				TradePost newPost = GameObject.CreatePrimitive (PrimitiveType.Sphere).AddComponent<TradePost> ();//create the sphere
-				newPost.tag = Tags.TP;//set the tag so the controller can see it
 				newPost.transform.position = Random.insideUnitSphere * sphereRadius;//set the position
 				newPost.transform.parent = GameObject.Find ("Posts").transform;//set the parent, so doesnt fill hierarchy
 				newPost.name = "Trade Post " + (n + 1);//set the name so is easier to find any later
@@ -62,7 +61,6 @@ namespace TradeSys {//use namespace to stop any name conflicts
 			for (int n = 0; n<numberOfTraders; n++) {//add new traders, setting them up
 				Trader newTrader = GameObject.CreatePrimitive (PrimitiveType.Cube).AddComponent<Trader> ();//create the cube
 				newTrader.gameObject.AddComponent<TSTraderAI>();//add the trader AI
-				newTrader.tag = Tags.T;//set the tag so the controller can see it
 				int random = Random.Range (0, controller.tradePosts.Length);//select the starting trade post from all of the trade posts
 				GameObject targetPost = controller.tradePosts [random];//set the start post
 				newTrader.transform.position = targetPost.transform.position;//set the position to the start trade post

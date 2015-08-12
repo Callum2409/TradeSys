@@ -24,7 +24,7 @@ public class TSTraderAI : MonoBehaviour
 
 		void Awake ()
 		{
-				tS = this.gameObject.GetComponent<TradeSys.Trader> ();//need to get the Trader script
+				tS = gameObject.GetComponent<TradeSys.Trader> ();//need to get the Trader script
 				
 				collect = GameObject.FindGameObjectWithTag (TradeSys.Tags.C).GetComponent<TradeSys.Controller> ().pickUp;//get the pickUP option in the controller
 		
@@ -35,18 +35,22 @@ public class TSTraderAI : MonoBehaviour
 		{
 				target = tS.target;//set the target. this saves referencing it in the trader script each time
 				
-				if (target == null)
+				if (target == null){
+				if(tS.finalPost != null)
 						target = tS.target = tS.finalPost.gameObject;//if not heading for anything, then go to the final post
+				else
+				target = tS.target = tS.startPost.gameObject;//if final post gone, go to start post
+						}//end if target null
 				//the line above is in case the item being collected has been collected by another trader
 				
 				if (tS.onCall && tS.allowGo) {//if these are both true, then the trader is allowed to move
 						//replace the next two lines with your movement AI with the destination set to be the target
-						this.transform.LookAt (target.transform.position);//look at where we want to go
-						this.transform.Translate (Vector3.forward * Time.timeScale * .05f);//move towards the target
+						transform.LookAt (target.transform.position);//look at where we want to go
+						transform.Translate (Vector3.forward * Time.timeScale * .05f);//move towards the target
 				
 						if (collect && tS.allowCollect) {//only needs to check for dropped items if is set in the controller and on the trader
 				
-								itemsInRadar = Physics.OverlapSphere (this.transform.position, radarDistance);//get the objects within the radar distance
+								itemsInRadar = Physics.OverlapSphere (transform.position, radarDistance);//get the objects within the radar distance
 					
 								GameObject cItem = null;//the closest gameobject of the collider
 								float cDist = Mathf.Infinity;//the distance that the closest object is away
@@ -61,7 +65,7 @@ public class TSTraderAI : MonoBehaviour
 												if (iS.traderCollect && tS.spaceRemaining >= (iS.number * controller.goods [iS.groupID].goods [iS.itemID].mass)) {
 														//check that the trader can collect the item and has enough cargo space for this item
 					
-														float dist = (this.transform.position - item.transform.position).sqrMagnitude;//get the magnitude of the distance away. uses sqrmagnitude as the actual distance is not required
+														float dist = (transform.position - item.transform.position).sqrMagnitude;//get the magnitude of the distance away. uses sqrmagnitude as the actual distance is not required
 					
 														if (dist < cDist) {//if is the closest item
 																cDist = dist;//set the closest distance
@@ -76,7 +80,7 @@ public class TSTraderAI : MonoBehaviour
 						}//end if collection allowed
 						
 						
-						if (target != null && Vector3.Distance (this.transform.position, target.transform.position) <= tS.closeDistance) { //is close enough
+						if (target != null && Vector3.Distance (transform.position, target.transform.position) <= tS.closeDistance) { //is close enough
 								if (target.gameObject.tag == TradeSys.Tags.TP)//if the target is a trade post
 										StartCoroutine (tS.AtPost ());//IMPORTANT - call the AtPost method, so will unload the cargo
 					else//else the target is an item, so needs to be picked up
@@ -98,8 +102,6 @@ public class TSTraderAI : MonoBehaviour
 						tS.spaceRemaining -= iS.number * controller.goods [iS.groupID].goods [iS.itemID].mass;//decrease the cargo space remaining
 						
 						iS.Collected ();//IMPORTANT - need to say that the item has been collected so the spawner count can be updated
-
-						Destroy (target);//destroy the object because it has been collected. could be replaced with an object pooling manager
 				}
 		}//end CollectItem
 }//end TSTraderAI

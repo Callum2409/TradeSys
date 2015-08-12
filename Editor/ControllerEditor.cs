@@ -33,6 +33,13 @@ namespace TradeSys
 						setup.tag = Tags.C;
 						Selection.activeGameObject = setup.gameObject;//select the new GameObject
 				}//end CreateController
+				
+		[MenuItem("GameObject/Create Other/TradeSys Controller", true)]
+		//validate allowing a controller to be added
+		static bool ValidateCreateController ()
+		{
+		return GameObject.FindGameObjectsWithTag(Tags.C).Length == 0;
+		}//end ValidateCreateController
 	
 				TSGUI GUITools = new TSGUI ();//extra gui methods, which are used by TradeSys scripts
 	
@@ -1599,7 +1606,7 @@ namespace TradeSys
 										return zero ? "0 " + cU.suffix : ((decimal)mass / (decimal)cU.min).ToString () + " " + cU.suffix;//return the correct unit
 								}//end if mass in range
 						}//end for each unit
-						return mass.ToString ();
+						return zero ? "0" : mass.ToString ();
 				}//end UnitString
 				
 				void SortCrate (SerializedProperty itemCrate)

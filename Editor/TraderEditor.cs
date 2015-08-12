@@ -63,6 +63,8 @@ namespace TradeSys
 	
 						GUITools.GetNames (controllerNormal);
 						GUITools.ManufactureInfo (controllerNormal);
+						
+			if(!Application.isPlaying)//only do this if it isnt playin
 						controllerNormal.SortAll ();
 				}//end OnEnable
 	
@@ -179,7 +181,6 @@ namespace TradeSys
 					
 					#region manufacturing
 								case 2:
-										//scrollPos.TM = GUITools.StartScroll (scrollPos.TM, smallScroll);
 										scrollPos.TM = GUITools.PTMan (manufacturing, scrollPos.TM, smallScroll, controllerSO.FindProperty ("manufacture"), controllerNormal, traderSO, false);
 										break;
 					#endregion

@@ -35,6 +35,8 @@ namespace TradeSys
 								EditorGUILayout.HelpBox ("Nothing here can be edited because this is a prefab.\nAll of the detals will be set by the controller when it is created.", MessageType.Info);
 						else {//else show options because is not a prefab
 						
+						controller.pickUp = true;//set to true so can be collected
+						
 								itemSO.Update ();
 				
 								#region get goods names

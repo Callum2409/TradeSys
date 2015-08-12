@@ -16,11 +16,13 @@ namespace TradeSys
 				public bool showHoriz;//show a list of items horizontally or vertically
 				public bool genOp, gamOp, traOp, pauOp;//the bools for if each option is showing in the controller
 				public bool opTP, opT;//the bools for if the options are showing for trade posts and traders
-				public bool sTi, sNo, sSh;//bools for options and shape for spawners
+				public bool sTi, sNo, sSp;//bools for options and shape for spawners
 				public string[][] allNames;//an array for each group with an array of the names
 				public string[][] manufactureNames;//an array with the names of each manufacturing process
 				public string[][] manufactureTooltips;//an array of strings with the tooltip for the manufacturng processes
 		#endif
+		
+				public string[] text;
 	
 		#region used variables
 		#region in editor
@@ -64,7 +66,7 @@ namespace TradeSys
 		#endregion
 	
 		#region other
-				float[][] postDistances;//This is used so that sqrMagnitude is called as little as possible
+				public float[][] postDistances;//This is used so that sqrMagnitude is called as little as possible
 				Distances[][] closest;//this is the closest x number of posts, which are used to work out trader targets
 	
 				int tradePostCount;//these are used so that the length of the array does not need to be used each time
@@ -74,7 +76,7 @@ namespace TradeSys
 		#endregion
 		#endregion	
 	
-				//			System.Diagnostics.Stopwatch stoppy = new System.Diagnostics.Stopwatch ();
+				//	System.Diagnostics.Stopwatch stoppy = new System.Diagnostics.Stopwatch ();
 
 				void Start ()
 				{				
@@ -103,12 +105,23 @@ namespace TradeSys
 						//for example, there may be obstacles in the way, so the actual distance will not be equal to the straight line distance
 						return (tp1.transform.position - tp2.transform.position).sqrMagnitude;//return the distance
 				}//end CalcDistance
+				
+				public void SingleDist (int postID, int start)
+				{//calculate the distance from one trade post to others
+						for (int p = start; p<tradePostCount; p++) {//go through posts to get distances
+								if (postID == p)//if the same, needs to be infinity so traders will move
+										postDistances [postID] [p] = Mathf.Infinity;//need to set this to infinity so that itself is not an optional post
+				else
+										postDistances [postID] [p] = postDistances [p] [postID] = CalcDistance (tradePosts [postID], tradePosts [p]);
+								//can set these the same to save on the number of calculations required, so is 0.5n(n+1)
+						}//end 2nd for	
+				}//end SingleDist
 	
 				public void GenerateDistances ()
 				{//At the start, needs to generate all of the distances and the closest posts for use later. As this is called first, will call all other methods
 						//generate the distances so that dont need to call sqrMagnitude each time, instead it can just be referenced from the array
 						SortAll ();//needs to make sure that everything is sorted properly before starting
-		
+
 						//initialise arrays
 						postDistances = new float[tradePostCount][];
 						closest = new Distances[tradePostCount][];
@@ -128,15 +141,8 @@ namespace TradeSys
 		
 						#region get distances
 						//now needs to go through and get all of the distances between all of the posts, where they are in the same group and faction
-						for (int t1 = 0; t1<tradePostCount; t1++) {//go through the posts
-								for (int t2 = t1; t2<tradePostCount; t2++) {//second for required so can get distances
-										if (t1 == t2)//if the same, needs to be infinity so traders will move
-												postDistances [t1] [t2] = Mathf.Infinity;//need to set this to infinity so that itself is not an optional post
-										else
-												postDistances [t1] [t2] = postDistances [t2] [t1] = CalcDistance (tradePosts [t1], tradePosts [t2]);
-										//can set these the same to save on the number of calculations required, so is 0.5n(n+1)
-								}//end 2nd for		
-						}//end 1st for
+						for (int p = 0; p<tradePostCount; p++)//go through the posts
+								SingleDist (p, p);
 						#endregion
 	
 						GetClosest ();//get the closest posts
@@ -155,8 +161,10 @@ namespace TradeSys
 						tradePostCount = tradePosts.Length;//set the post count to the length
 						postScripts = new TradePost[tradePostCount];
 		
-						for (int t = 0; t<tradePostCount; t++) //go through trade posts getting script
+						for (int t = 0; t<tradePostCount; t++) { //go through trade posts getting script
 								postScripts [t] = tradePosts [t].GetComponent<TradePost> ();
+								postScripts [t].postID = t;//set the postID
+						}//end for all posts
 				}//end GetPostScripts
 				
 				public void GetTraderScripts ()
@@ -315,6 +323,7 @@ namespace TradeSys
 				
 				public void SortAll ()
 				{//sort out all trade posts and traders
+						//only do this if not in the editor
 						GetPostScripts ();
 						GetTraderScripts ();
 				
@@ -443,7 +452,8 @@ namespace TradeSys
 						GameObject[] spawnerObjects = GameObject.FindGameObjectsWithTag (Tags.S);
 						spawners = new Spawner[spawnerObjects.Length];
 						
-						if (spawnerObjects.Length > 0)//if spawners are in game, needs to be set to true
+						if (spawnerObjects.Length > 0 || GameObject.FindGameObjectsWithTag (Tags.I).Length > 0)
+						//if spawners are in game or items, needs to be set to true
 								pickUp = true;
 				
 						for (int s = 0; s<spawnerObjects.Length; s++) {//go through spawner objects, getting the scripts and sorting
@@ -711,13 +721,14 @@ namespace TradeSys
 				void DrawLines ()
 				{//draw lines showing the possible trade links. Is here so that lines can also be drawn in the game view
 						GetPostScripts ();
+						
 						for (int p1 = 0; p1<tradePostCount; p1++) {//go through trade posts
 								for (int p2 = p1+1; p2<tradePostCount; p2++) {//go through possible connection posts
 										if (CheckFactionsGroups (postScripts [p1], postScripts [p2])) {//check in the same faction / group
 												if (!factions.enabled) {//if factions not enabled, then only green lines
 														if (Application.isPlaying && showLinesInGame) {//if is playing, use line renderer
 																LineRenderer line = new GameObject ().AddComponent<LineRenderer> ();
-																line.transform.parent = this.transform;
+																line.transform.parent = transform;
 																line.material = new Material (Shader.Find ("Self-Illumin/Diffuse"));
 																line.material.color = Color.green;
 																line.SetPosition (0, tradePosts [p1].transform.position);
@@ -738,7 +749,7 @@ namespace TradeSys
 														for (int c = 0; c<coloursCount; c++) {//go through all of the colours
 																if (Application.isPlaying && showLinesInGame) {//is is playing, use line renderer
 																		LineRenderer linef = new GameObject ().AddComponent<LineRenderer> ();
-																		linef.transform.parent = this.transform;
+																		linef.transform.parent = transform;
 																		linef.name = tradePosts [p1].name + " " + tradePosts [p2].name + " " + c;
 																		linef.material = new Material (Shader.Find ("Self-Illumin/Diffuse"));
 																		linef.material.color = colours [c];
@@ -776,17 +787,88 @@ namespace TradeSys
 				}//end EditProcess
 				
 				public void SortTraderDestination (TradePost target)
-				{//if the factions, groups or trade options are changed, need to sort out traders enroute
-						int pID = GetPostID (target.gameObject);//get the int id of the trade post
-				
+				{//if the factions, groups or trade options are changed, need to sort out traders enroute				
 						for (int t = 0; t<traderCount; t++) {//go through all traders
-								if (traderScripts [t].postID == pID) {//if target post is one which has been edited
-										Trader trader = traderScripts [t];
-										trader.target = trader.startPost.gameObject;//go back to where the trader came from
-										trader.finalPost = trader.startPost;//go back to starting post
-										trader.postID = GetPostID (trader.finalPost.gameObject);
-								}//end for check trader destination post
-						}//end for traders
+								Trader trader = traderScripts [t];//get the current trader
+						
+								if (trader.postID == target.postID) {//if the target post of the trader is the same as being edited
+										if (!(CheckFactionsGroups (target, trader.startPost) && CheckTraderFaction (trader, target)))
+						//if the groups or the factions of the posts dont overlap and if the trader is not in the same faction as the target, then go home
+												TraderHome (trader);//send the trader home
+										//else, the trader can continue going there
+								}//end if same post
+						}//end for all traders
 				}//end SortTraderDestination
+				
+				public void TraderAllHome (int postID)
+				{//send any traders back to the start post if it is heading for the selected post
+						for (int t = 0; t<traderCount; t++) {//go through all traders
+								if (traderScripts [t].postID == postID)//if target post is one which has been edited
+										TraderHome (traderScripts [t]);//send back home
+						}//end for all traders
+				}//end TraderAllHome
+				
+				public void TraderHome (Trader trader)
+				{//send the trader back to the start post
+						trader.target = trader.startPost.gameObject;//go back to where the trader came from
+						trader.finalPost = trader.startPost;//go back to starting post
+						trader.postID = trader.finalPost.postID;//set the postID
+				}//end TraderHome
+				
+				public void AddPost (TradePost newPost)
+				{//called when a trade post has been added
+						int postID = tradePostCount;//set this as the last entry in the array will be the new trade post
+
+						SortAll ();//can call SortAll because the order will not have changed
+	
+						System.Array.Resize (ref postDistances, tradePostCount);//resize the distances array for the new post
+						postDistances [postID] = new float[tradePostCount];//the new entry needs to be set to the correct size
+				
+						for (int p = 0; p<postID; p++)//go through all posts up to the new one
+								System.Array.Resize (ref postDistances [p], tradePostCount);//resize these too
+								
+						SingleDist (postID, 0);//fill in the newly added post details
+
+						closest = new Distances[tradePostCount][];//can make a new one because the data will be overwritten anyway
+						GetClosest ();//get the new closest posts
+				}//end AddPost
+				
+				public void RemovePost (int postID)
+				{//sort the IDs and remove the selected post from the distance matrix and closest distances
+						for (int p = 0; p<tradePostCount; p++) {//go through all posts
+								if (postScripts [p].postID > postID)//if the ID is greater than the one being deleted, decrease
+										postScripts [p].postID--;//decrease the postID by one
+						}//end for all posts
+			
+						for (int t = 0; t<traderCount; t++) {//go through all traders
+								if (traderScripts [t].postID > postID)//if the postID is greater, decrease by one
+										traderScripts [t].postID--;//decrease the postID by one
+								//if is the same, then should already be going home as post is shut down
+						}//end for all traders
+				
+						List<float[]> newDist = postDistances.ToList ();//convert the distances to a list for easier removal
+						newDist.RemoveAt (postID);//remove the element
+						postDistances = newDist.ToArray ();//put back in an array
+					
+						for (int p = 0; p<tradePostCount-1; p++) {//go through remaining elements, doing the same
+								List<float> newDist2 = postDistances [p].ToList ();//convert the distances to a list for easier removal
+								newDist2.RemoveAt (postID);//remove the element
+								postDistances [p] = newDist2.ToArray ();//put back in an array
+						}//end for remaining posts
+						
+						tradePostCount--;//need to manually reduce the post count here
+						
+						List<GameObject> newPosts = tradePosts.ToList ();//put the posts into a list for easy removal
+						newPosts.RemoveAt (postID);//remove the post
+						tradePosts = newPosts.ToArray ();//put back into an array
+			
+						List<TradePost> newScripts = postScripts.ToList ();//put the scripts into a list for easy removal
+						newScripts.RemoveAt (postID);//remove the script
+						postScripts = newScripts.ToArray ();//put back into an array
+						
+						closest = new Distances[tradePostCount][];//resize the closest posts
+						
+						GetClosest ();//update the closest posts
+				}//end RemovePost
 		}//end Controller
 }//end namespace

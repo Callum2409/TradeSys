@@ -27,6 +27,7 @@ namespace TradeSys
 				private SerializedProperty min, max, tot, diff, countCrates;
 				private SerializedProperty maxDist;
 				private SerializedProperty specifySeed, seed;
+				private SerializedProperty traderCollect;
 				string[] shapes = new string[]{"Sphere", "Circle", "Cube", "Square"};
 				#endregion
 		
@@ -55,10 +56,14 @@ namespace TradeSys
 						
 						specifySeed = spawnerSO.FindProperty("specifySeed");
 						seed = spawnerSO.FindProperty("seed");
+						
+						traderCollect = spawnerSO.FindProperty("traderCollect");
 			
 						scrollPos = controllerNormal.scrollPos;
 			
 						GUITools.GetNames (controllerNormal);
+						
+			if(!Application.isPlaying)//only do this if it isnt playin
 						controllerNormal.SortAll ();
 				}//end OnEnable
 	
@@ -141,7 +146,7 @@ namespace TradeSys
 								EditorGUILayout.EndVertical ();
 				#endregion
 				#region shape
-								if (GUITools.TitleGroup (new GUIContent ("Shape", "Set the spawn shape options"), controllerSO.FindProperty ("sSh"), false)) {//if showing shape options
+								if (GUITools.TitleGroup (new GUIContent ("Spawn", "Set the spawn options"), controllerSO.FindProperty ("sSp"), false)) {//if showing shape options
 										EditorGUILayout.BeginHorizontal ();
 										int selected = spawnerNormal.shapeOption;
 										selected = EditorGUILayout.Popup (selected, shapes, "DropDownButton");
@@ -159,6 +164,8 @@ namespace TradeSys
 				
 										if (maxDist.floatValue < 0)
 												maxDist.floatValue = 0;
+												
+										EditorGUILayout.PropertyField(traderCollect, new GUIContent("Trader collect", "Select whether a trader is allowed to collect items created at this spawner"));
 								}//end if showing shape
 								EditorGUILayout.EndVertical ();
 				#endregion
@@ -182,5 +189,14 @@ namespace TradeSys
 						if(GUI.changed)
 						EditorUtility.SetDirty(target);
 				}//end OnInspectorGUI
+				
+		void OnSceneGUI()
+		{
+			Handles.color = Color.green;
+			Handles.matrix = Matrix4x4.TRS (spawnerNormal.transform.position, spawnerNormal.transform.rotation, spawnerNormal.transform.lossyScale);
+		
+		if(spawnerNormal.shapeOption == 1)//if is a circle
+		Handles.DrawWireDisc(Vector3.zero, Vector3.forward, maxDist.floatValue);
+		}//end OnSceneGUI
 		}//end SpawnerEditor
 }//end namespace

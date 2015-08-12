@@ -25,6 +25,8 @@ namespace TradeSys
 				internal bool updated;//true if the prices have been updated in the current TradeCall
 		
 				public bool allowTrades = true, allowManufacture = true;//whether a trade post is allowed to trade or manufacture items. Does not show in editor so everything keeps previous values
+		
+				public int postID;//this is the location within the post array in the controller
 		#endregion
 	
 //System.Diagnostics.Stopwatch stoppy = new System.Diagnostics.Stopwatch();
@@ -32,12 +34,7 @@ namespace TradeSys
 				void Awake ()
 				{
 						controller = GameObject.FindGameObjectWithTag (Tags.C).GetComponent<Controller> ();
-						for (int m1 = 0; m1<manufacture.Count; m1++) {//for all manufacture groups
-								for (int m2 = 0; m2<manufacture[m1].manufacture.Count; m2++) {//for all manufacture processes
-										if (manufacture [m1].manufacture [m2].enabled)
-												controller.manufacture [m1].manufacture [m2].postCount++;
-								}//end for manufacture processes
-						}//end for manufacture groups
+						tag = Tags.TP;
 				}//end Awake
 	
 				public void UpdatePrices ()
@@ -170,7 +167,7 @@ namespace TradeSys
 								}//end for groups
 								allowTrades = enableTrades;//set to new value
 				if(!enableTrades)
-				controller.SortTraderDestination(this);//need to sort destinations of traders enroute
+				controller.TraderAllHome(postID);//need to sort destinations of traders enroute
 			}//end check changing trades
 						allowManufacture = enableManufacture;//set to the value
 				}//end EnableDisableTradeMan
@@ -207,12 +204,12 @@ namespace TradeSys
 				/// <param name="itemID">Item ID within the group</param>
 				/// <param name="number">Number to add</param>
 				public void AddRemoveGood(int groupID, int itemID, int number){
-			if(number >= 0 || stock[groupID].stock[itemID].number - number > 0){//check that there is enough of the item if removing items
-					stock[groupID].stock[itemID].number += number;//add the items to the trade post
-					controller.UpdateAverage(groupID, itemID, number, 0);//update the average stock numbers required for item pricing
-					UpdateSinglePrice(groupID, itemID);//update the item price
+					if(stock[groupID].stock[itemID].number + number > 0){//check that there is enough of the item if removing items
+						stock[groupID].stock[itemID].number += number;//add the items to the trade post
+						controller.UpdateAverage(groupID, itemID, number, 0);//update the average stock numbers required for item pricing
+						UpdateSinglePrice(groupID, itemID);//update the item price
 					}else//else if not enough, display error
-					Debug.LogError("Not enough items in stock to remove!");
+						Debug.LogError("Not enough items in stock to remove!");
 				}//end AddGood
 				
 		/// <summary>
@@ -222,10 +219,10 @@ namespace TradeSys
 		/// <param name="toChange">The enabled factions or groups</param>
 			public void ChangeFactionsGroups(bool factionsGroups, List<bool> toChange){
 				if((factionsGroups && controller.factions.enabled) || (!factionsGroups && controller.groups.enabled)){//only need to make changes if enabled
-					if(toChange.Count != (factionsGroups?factions.Count:groups.Count))//if not the same length, give an error
+					if(toChange.Count != (factionsGroups?factions.Count:groups.Count)){//if not the same length, give an error
 						Debug.LogError((factionsGroups?"Factions":"Groups")+" list is not the same length as the number of "
 						+(factionsGroups?"factions":"groups")+" available!");
-				else{
+				}else{
 				
 					if(factionsGroups)
 					factions = toChange;
@@ -237,5 +234,23 @@ namespace TradeSys
 				}//else make changes
 				}//end if factions enabled
 				}//end ChangeFactionsGroups
+				
+		public void MovedPost()
+		{//called when the post has been moved
+			controller.SingleDist (postID, 0);
+			controller.GetClosest ();//now needs to recalulate the closest posts
+		}//end MovedPost
+		
+		public void RemovePost()
+		{//call when you want to remove the trade post
+		EnableDisableTradeMan(false, false);//shut down the trade post
+		controller.RemovePost(postID);//sort the IDs and remove the post		
+		DeletePost();//called last as this will delete itself	
+		}//end RemovePost
+		
+		void DeletePost()
+		{//this is called by the controller when a post is being removed. Change the code here to use pooling or do something else
+		Destroy(gameObject);
+		}//end DeletePost
 	}//end TradePost
 }//end namespace

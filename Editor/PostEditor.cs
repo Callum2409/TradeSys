@@ -33,6 +33,7 @@ namespace TradeSys
 				private SerializedProperty customPricing, cash;
 				private SerializedProperty tags, groups, factions;
 				private SerializedProperty stopProcesses;
+				private SerializedProperty allowTrades, allowMan;
 		#endregion
 	
 				void OnEnable ()
@@ -62,9 +63,13 @@ namespace TradeSys
 						factions = postSO.FindProperty ("factions");	
 		
 						stopProcesses = postSO.FindProperty ("stopProcesses");
+						allowTrades = postSO.FindProperty("allowTrades");
+						allowMan = postSO.FindProperty("allowManufacture");
 		
 						GUITools.GetNames (controllerNormal);
 						GUITools.ManufactureInfo (controllerNormal);
+						
+						if(!Application.isPlaying)//only do this if it isnt playing
 						controllerNormal.SortAll ();
 				}//end OnEnable
 	
@@ -102,6 +107,11 @@ namespace TradeSys
 										EditorGUILayout.EndHorizontal ();
 			
 										EditorGUILayout.PropertyField (postSO.FindProperty ("stopProcesses"), new GUIContent ("Stop processes", "Stop manufacturing processes if it will result in the number of an item going out of the specified range"));
+								
+										EditorGUILayout.BeginHorizontal();
+										EditorGUILayout.PropertyField(allowTrades, new GUIContent("Allow trades", "Select if the trade post is allowed to trade. This will not prevent any options and is so that it can be turned on/off easily"));
+										EditorGUILayout.PropertyField(allowMan, new GUIContent("Allow manufacture", "Select if the trade post is allowed to manufacture. This will not prevent any options and is so that it can be turned on/off easily"));
+										EditorGUILayout.EndHorizontal();
 								}//end if showing options
 								EditorGUILayout.EndVertical ();
 					#endregion

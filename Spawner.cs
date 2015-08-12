@@ -18,6 +18,7 @@ namespace TradeSys
 				public bool countCrates;//whether is counting the number of crates or the number of items
 				public bool diffItems;//if selected, will spawn multiple different rather than increasing count
 				public bool specifySeed;//allow the seed to be set specifically
+				public bool traderCollect = true;//whether traders can collect items spawned
 				public int seed;//means that it is possible for it to be the same each time
 				
 				Controller controller;
@@ -28,6 +29,7 @@ namespace TradeSys
 				void Awake ()
 				{
 						controller = GameObject.FindGameObjectWithTag (Tags.C).GetComponent<Controller> ();
+						tag = Tags.S;
 						
 						//get all of the items which can be spawned to make random numbers easier
 						for (int g = 0; g<items.Count; g++) {//for all groups
@@ -91,10 +93,10 @@ namespace TradeSys
 								break;
 						}//end switch
 						
-						spawned.transform.position = this.transform.position + this.transform.rotation * Vector3.Scale(spawned.transform.position, this.transform.lossyScale);
+						spawned.transform.position = transform.position + transform.rotation * Vector3.Scale(spawned.transform.position, transform.lossyScale);
 						//sort out position relating to spawner position and rotation
 				
-						spawned.transform.parent = this.transform;//set the spawned item to be under the spawner
+						spawned.transform.parent = transform;//set the spawned item to be under the spawner
 						spawned.name = controller.goods [chosen.groupID].goods [chosen.itemID].name + "\u00D7" + number.ToString ();
 			
 						Item spawnedScript = spawned.GetComponent<Item> ();//get the item script
@@ -103,11 +105,10 @@ namespace TradeSys
 						spawnedScript.groupID = chosen.groupID;//set the groupID
 						spawnedScript.itemID = chosen.itemID;//set the itemID	
 						spawnedScript.number = number;//set the number of this item
-						spawnedScript.traderCollect = true;//let traders collect this item
+						spawnedScript.traderCollect = traderCollect;//set the trader collect to the one set in the editor
+						spawnedScript.spawned = true;//let the item know that it was spawned
 						
 						ChangeCount(number, true);
-						
-						controller.UpdateAverage (chosen.groupID, chosen.itemID, number, 0);//update the item averages
 				}//end Create
 				
 				float RandomLength (float maxDist)
@@ -119,7 +120,7 @@ namespace TradeSys
 				void OnDrawGizmosSelected ()
 				{//draw the shapes of the spawn areas				
 						Gizmos.color = Color.green;
-						Gizmos.matrix = Matrix4x4.TRS (this.transform.position, this.transform.rotation, this.transform.lossyScale);
+						Gizmos.matrix = Matrix4x4.TRS (transform.position, transform.rotation, transform.lossyScale);
 				
 						switch (shapeOption) {//use a switch for the different spawn areas
 						case 0://sphere

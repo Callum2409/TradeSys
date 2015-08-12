@@ -16,7 +16,7 @@ I hope this is useful in creating your GUI!
 	
 		public float transMult = 0.1f, rotMult = 1f;//multipliers used to change translation and rotation speeds
 	
-		public float closeDistance = 1;//how close the player needs to be before counting as being at the trade post
+		public float closeDistance = 1;//how close the player needs to be before counting as being at the trade post or to collect an item
 		public double cargoSpace = 10;//the cargo space that the player has
 		public int cash = 1000;//the cash that the player has
 		int[][] cargo;//the cargo being carried by the player
@@ -25,12 +25,16 @@ I hope this is useful in creating your GUI!
 		bool enter, inside;//if the player is close enough to enter, if is in inside mode or not
 	
 		TradeSys.TradePost nearPost;//this is the trade post that the player is in or is near enough to
+		TradeSys.Item nearItem;//the item that the player is near enough to to pick up the item
 	
 		string unitLabel = " ";//this is just the unit of the maximum mass to be used with space remaining
 	
 		int selected = 0;//this is used with the toolbar for exit, buy and sell
 	
 		Vector2 scrollPos;//the position of the scrollbar showing all of the items
+		
+		string pickup;//the text saying that you have collected an item
+		float textshow;//the time when the pickup text was first shown. this is so that after a time, it will disappear
 	
 		void Start ()
 		{
@@ -75,7 +79,21 @@ I hope this is useful in creating your GUI!
 		//means that it is only possible to pause when is not showing the inside
 		else
 						Time.timeScale = 1;//else dont pause
-				
+						
+				if (nearItem != null) {//if not null, then there is something to collect
+						double mass = controller.goods [nearItem.groupID].goods [nearItem.itemID].mass * nearItem.number;//the mass of the items in the crate
+						if (spaceRemaining >= mass) {//if has enough space remaining
+								spaceRemaining -= mass;//remove the space remaining
+								cargo [nearItem.groupID] [nearItem.itemID] += nearItem.number;//add the items to the cargo hold
+				pickup = "You collected " + nearItem.number+"\u00D7"+controller.goods [nearItem.groupID].goods [nearItem.itemID].name;
+								textshow = Time.timeSinceLevelLoad;//set when the text first shown
+								nearItem.Collected ();//need to tell the item that it has been collected
+						}//end if not enough space
+				}//end if item in radar
+						
+						
+				if (Time.timeSinceLevelLoad - textshow > 3)//if shown for more than 3 seconds, dont
+						pickup = "";//set to blank so that the label doesnt need to be disabled
 		}//end Update
 	
 		bool CheckPos ()
@@ -86,20 +104,24 @@ I hope this is useful in creating your GUI!
 						if (nearbyObjects [n].tag == TradeSys.Tags.TP) {//check has the trade post tag
 								nearPost = nearbyObjects [n].GetComponent<TradeSys.TradePost> ();//set the near post to the trade post script
 								return true;//return true so doesnt go through the rest of the nearby objects
-						}//end if trade post tag
+						} else if (nearbyObjects [n].tag == TradeSys.Tags.I && controller.pickUp) {//if item tag and allowed to collect
+								nearItem = nearbyObjects [n].GetComponent<TradeSys.Item> ();//set the near item to this
+								return false;//needs to return false so is not seen to be at a trade post
+						}//end if item
 				}//end for all nearby objects
 				return false;//return false as has not found anything
 		}//end CheckPos
 	
 		void OnGUI ()
 		{//display the GUI
+		
+				GUI.skin.box.fontSize = 35;//set the font sizes
+				GUI.skin.label.fontSize = 20;
+		
 				if (enter && !inside && GUI.Button (new Rect (Screen.width - 110, 10, 100, 30), "Enter Post"))//if allowed to enter and enter post button pressed
 						inside = true;
 			
 				if (inside) {//if entered inside menu
-			
-						GUI.skin.box.fontSize = 35;//set the font sizes
-						GUI.skin.label.fontSize = 20;
 		
 						GUI.Box (new Rect (5, 5, Screen.width - 10, Screen.height - 10), nearPost.name);//create a box with the name of the trade post at the top
 			
@@ -110,15 +132,15 @@ I hope this is useful in creating your GUI!
 						
 						if (enabled [0])
 								EstateAgent ();
-								else if (enabled[1])
-								ShowPurchasable();
+						else if (enabled [1])
+								ShowPurchasable ();
 						else if (enabled [2])
 								ShowOwned ();
 						else
 								ShowShop ();
-			
-			
 				}//end show inside
+				
+				GUI.Label (new Rect (10, Screen.height - 50, 500, 30), pickup);//display that item was collected
 		}//end OnGUI()
 	
 		void EstateAgent ()
@@ -127,7 +149,7 @@ I hope this is useful in creating your GUI!
 		
 				List<TradeSys.TradePost> purchasable = new List<TradeSys.TradePost> ();//the list containing all of the trade posts which can be purchased
 				for (int p = 0; p<controller.postScripts.Length; p++) {//go through all posts
-						if (controller.postScripts [p].tags[1])//if has the purchasable tag checked
+						if (controller.postScripts [p].tags [1])//if has the purchasable tag checked
 								purchasable.Add (controller.postScripts [p]);//add the trade post to the list of purchasable posts
 				}//end for all posts
 				
@@ -143,8 +165,8 @@ I hope this is useful in creating your GUI!
 								nearPost.cash += purchasable [p].cash;//add funds to estate agent as might be doing trading
 								purchasable [p].cash = 0;//set the cash of the purhcased post to 0
 			
-								purchasable [p].tags[1] = false;//set purchasable tag to false
-								purchasable [p].tags[2] = true;//set owned tag to true
+								purchasable [p].tags [1] = false;//set purchasable tag to false
+								purchasable [p].tags [2] = true;//set owned tag to true
 			
 						}//end if purchase clicked
 				}//end for all purchasable
@@ -152,9 +174,10 @@ I hope this is useful in creating your GUI!
 				GUI.EndScrollView ();//end the scroll view
 		}//end EstateAgent
 		
-		void ShowPurchasable(){//show info that the trade post is for sale
-		GUI.Label (new Rect (Screen.width/2-200, Screen.height/2-75, 400, 150), "This trade post is for sale. "+
-		"Visit the estate agents (magenta trade post) to purchase this trade post for "+nearPost.cash);
+		void ShowPurchasable ()
+		{//show info that the trade post is for sale
+				GUI.Label (new Rect (Screen.width / 2 - 200, Screen.height / 2 - 75, 400, 150), "This trade post is for sale. " +
+						"Visit the estate agents (magenta trade post) to purchase this trade post for " + nearPost.cash);
 		}//end ShowPurchasable
 		
 		void ShowOwned ()
@@ -198,13 +221,13 @@ I hope this is useful in creating your GUI!
 										GUI.Label (new Rect (50, labelPos * 30, 100, 30), controller.goods [g].goods [i].name);//show the name of the machinery
 				
 										if (!nearPost.manufacture [i].enabled) {//if the manufacturing process is not already enabled, then have an option to fit the machinery to enable it
-						if(cargo [g] [i] > 0){//make sure has one to fit
-						if (GUI.Button (new Rect (160, labelPos * 30, 150, 30), "Add to trade post")) {//if add to trade post pressed
-														cargo [g] [i]--;//remove the machinery
-														nearPost.manufacture [i].enabled = true;//enable the manufacturing process
-												}//end if add to trade post
-												}else//say need to buy
-												GUI.Label (new Rect (160, labelPos * 30, 250, 30), "Need to purchase first!");//show message saying need to buy first
+												if (cargo [g] [i] > 0) {//make sure has one to fit
+														if (GUI.Button (new Rect (160, labelPos * 30, 150, 30), "Add to trade post")) {//if add to trade post pressed
+																cargo [g] [i]--;//remove the machinery
+																nearPost.manufacture [i].enabled = true;//enable the manufacturing process
+														}//end if add to trade post
+												} else//say need to buy
+														GUI.Label (new Rect (160, labelPos * 30, 250, 30), "Need to purchase first!");//show message saying need to buy first
 										} else//end if can add machinery
 												GUI.Label (new Rect (160, labelPos * 30, 250, 30), "Already fitted to trade post!");//show message saying already added
 								}//end for machinery
