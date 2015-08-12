@@ -26,7 +26,7 @@ public class ControllerEditor : Editor
 		controller = (Controller)target;
 		directories = AssetDatabase.GetAllAssetPaths ();//get all assets so item crate finder works
 		
-		if (!controller.directories.SequenceEqual (directories) && !reloading && (controller.loadTraderPrefabs || controller.expendable)) {//check if directories are the same, so dont have to reload		
+		if (!controller.directories.SequenceEqual (directories) && !reloading && (controller.loadTraderPrefabs || controller.expendable) && !Application.isPlaying) {//check if directories are the same, so dont have to reload		
 			controller.directories = directories;
 			if (!ProgressBar ()) {
 				Debug.LogWarning("Trader prefab loading was not allowed to complete. Load trader prefabs and expendable traders have been disabled.");
@@ -189,6 +189,8 @@ public class ControllerEditor : Editor
 				EditorGUILayout.BeginVertical ("HelpBox");
 			bool eB = controller.expendable;
 			controller.expendable = EditorGUILayout.Toggle ("Expendable traders", controller.expendable);
+			if(Application.isPlaying)
+				controller.expendable = eB;
 			if (!eB && controller.expendable && !controller.loadTraderPrefabs) {
 				if (!reloading && !ProgressBar ())
 					controller.expendable = false;

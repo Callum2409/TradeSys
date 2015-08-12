@@ -103,8 +103,6 @@ public class Trader : MonoBehaviour
 	
 	public void ExitPause ()
 	{
-		if (trading.Count == 0 && controller.moving.FindIndex (x => controller.posts[x.postB] == target) == -1)
-			Debug.LogError(this.name+" is moving but the controller has not been told");
 		if (!controller.pauseOnExit || ((controller.pauseOption == 2 || controller.pauseOption == 3) && trading.Count == 0))
 			allowGo = true;
 		else
