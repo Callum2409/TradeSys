@@ -1,7 +1,13 @@
+#if UNITY_4_0 || UNITY_4_1 || UNITY_4_2
+#define API
+#endif
+
 using UnityEngine;
 using UnityEditor;
 using System.Collections;
 using System.Collections.Generic;
+
+namespace TradeSys{//uses TradeSys namespace to prevent any conflicts
 
 [CustomEditor(typeof(TradePost))]
 public class PostEditor : Editor
@@ -23,6 +29,11 @@ public class PostEditor : Editor
 	
 	public override void OnInspectorGUI ()
 	{
+		
+		#if !API
+		Undo.RecordObject(controller, "TradeSys Trade Post");
+		#endif
+		
 		EditorGUILayout.BeginHorizontal ();
 		GUILayout.FlexibleSpace ();
 		controller.selP = GUILayout.Toolbar (controller.selP, new string[]{"Settings", "Stock", "Manufacturing"});
@@ -52,12 +63,18 @@ public class PostEditor : Editor
 					EditorGUILayout.BeginHorizontal ();
 					EditorGUILayout.LabelField ("Allow trade with group", EditorStyles.boldLabel);
 					if (GUILayout.Button ("Select all", EditorStyles.miniButtonLeft)) {
+						#if API
 						Undo.RegisterUndo ((TradePost)target, "Select all groups");
+						#endif
+						
 						for (int g = 0; g<post.groups.Count; g++)
 							post.groups [g] = true;
 					}
 					if (GUILayout.Button ("Select none", EditorStyles.miniButtonRight)) {
+						#if API
 						Undo.RegisterUndo ((TradePost)target, "Select no groups");
+						#endif
+						
 						for (int g = 0; g<post.groups.Count; g++)
 							post.groups [g] = false;
 					}
@@ -99,12 +116,18 @@ public class PostEditor : Editor
 					EditorGUILayout.BeginHorizontal ();
 					EditorGUILayout.LabelField ("Select factions", EditorStyles.boldLabel);
 					if (GUILayout.Button ("Select all", EditorStyles.miniButtonLeft)) {
+						#if API
 						Undo.RegisterUndo ((TradePost)target, "Select all factions");
+						#endif
+						
 						for (int f = 0; f<post.factions.Count; f++)
 							post.factions [f] = true;
 					}
 					if (GUILayout.Button ("Select none", EditorStyles.miniButtonRight)) {
+						#if API
 						Undo.RegisterUndo ((TradePost)target, "Select no factions");
+						#endif
+						
 						for (int f = 0; f<post.factions.Count; f++)
 							post.factions [f] = false;
 					}
@@ -145,12 +168,18 @@ public class PostEditor : Editor
 				EditorGUILayout.BeginHorizontal ();
 				EditorGUILayout.LabelField ("Allow item at this post", EditorStyles.boldLabel);
 				if (GUILayout.Button ("Select all", EditorStyles.miniButtonLeft)) {
+					#if API
 					Undo.RegisterUndo ((TradePost)target, "Select all items");
+					#endif
+					
 					for (int s = 0; s<post.stock.Count; s++)
 						post.stock [s].allow = true;
 				}
 				if (GUILayout.Button ("Select none", EditorStyles.miniButtonRight)) {
+					#if API
 					Undo.RegisterUndo ((TradePost)target, "Select no items");
+					#endif
+					
 					for (int s = 0; s<post.stock.Count; s++) 
 						post.stock [s].allow = false;
 				}
@@ -268,3 +297,4 @@ public class PostEditor : Editor
 		}//end show routes
 	}
 }
+}//end namespace

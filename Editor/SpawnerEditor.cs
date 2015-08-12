@@ -1,7 +1,13 @@
+#if UNITY_4_0 || UNITY_4_1 || UNITY_4_2
+#define API
+#endif
+
 using UnityEngine;
 using UnityEditor;
 using System.Collections;
 using System.Collections.Generic;
+
+namespace TradeSys{//uses TradeSys namespace to prevent any conflicts
 
 [CustomEditor(typeof(Spawner))]
 public class SpawnerEditor : Editor
@@ -18,6 +24,10 @@ public class SpawnerEditor : Editor
 	
 	public override void OnInspectorGUI ()
 	{
+		#if !API
+		Undo.RecordObject(controller, "TradeSys Spawner");
+		#endif
+		
 		EditorGUILayout.BeginVertical ("HelpBox");
 		EditorGUI.indentLevel = 0;
 		EditorGUILayout.BeginHorizontal ();
@@ -64,13 +74,19 @@ public class SpawnerEditor : Editor
 			EditorGUILayout.BeginHorizontal ();
 			EditorGUILayout.LabelField ("Allow item to be spawned", EditorStyles.boldLabel);
 			if (GUILayout.Button ("Select all", EditorStyles.miniButtonLeft)) {
+				#if API
 				Undo.RegisterUndo ((Spawner)target, "Select all items");
+				#endif
+				
 				for (int s = 0; s<spawner.allowSpawn.Count; s++) {
 					spawner.allowSpawn [s] = true;
 				}
 			}
 			if (GUILayout.Button ("Select none", EditorStyles.miniButtonRight)) {
+				#if API
 				Undo.RegisterUndo ((Spawner)target, "Select no items");
+				#endif
+				
 				for (int s = 0; s<spawner.allowSpawn.Count; s++) {
 					spawner.allowSpawn [s] = false;
 				}
@@ -119,6 +135,5 @@ public class SpawnerEditor : Editor
 			}
 		}
 	}
-	
-	
 }
+}//end namespace

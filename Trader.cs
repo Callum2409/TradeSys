@@ -2,6 +2,8 @@ using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 
+namespace TradeSys{//uses TradeSys namespace to prevent any conflicts
+
 [System.Serializable]
 public class NoType
 {
@@ -103,6 +105,8 @@ public class Trader : MonoBehaviour
 	
 	public void ExitPause ()
 	{
+		if (trading.Count == 0 && controller.moving.FindIndex (x => controller.posts[x.postB] == target) == -1)
+			Debug.LogError(this.name+" is moving but the controller has not been told");
 		if (!controller.pauseOnExit || ((controller.pauseOption == 2 || controller.pauseOption == 3) && trading.Count == 0))
 			allowGo = true;
 		else
@@ -202,3 +206,4 @@ public class Trader : MonoBehaviour
 		}
 	}
 }
+}//end namespace

@@ -1,8 +1,14 @@
+#if UNITY_4_0 || UNITY_4_1 || UNITY_4_2
+#define API
+#endif
+
 using UnityEngine;
 using UnityEditor;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+
+namespace TradeSys{//uses TradeSys namespace to prevent any conflicts
 
 [CustomEditor(typeof(Trader))]
 public class TraderEditor : Editor
@@ -21,6 +27,10 @@ public class TraderEditor : Editor
 	
 	public override void OnInspectorGUI ()
 	{
+		#if !API
+		Undo.RecordObject(controller, "TradeSys Trader");
+		#endif
+	
 		if (!controller.loadTraderPrefabs && !InHierarchy () && !controller.expendable) {
 			EditorGUILayout.HelpBox ("Nothing here can be set because:\n - The trader is not in the hierarchy\n - Expendable traders is disabled\n - Loading trader prefabs is off", MessageType.Info);
 		} else {
@@ -31,11 +41,17 @@ public class TraderEditor : Editor
 			trader.target = (GameObject)EditorGUILayout.ObjectField (new GUIContent ("Target post", "This is the post that the trader starts at. This will change when playing to the post that the trader is going to."), trader.target, typeof(GameObject), true);
 		
 			if (GUILayout.Button (new GUIContent ("Find post", "This will find the post that the trader is next to. Needs to be within 1 unit."), EditorStyles.miniButtonLeft)) {
+				#if API
 				Undo.RegisterUndo ((Trader)target, "Find post");
+				#endif
+				
 				bool find = false;
 				for (int p = 0; p< posts.Length; p++) {
 					if (Vector3.Distance (posts [p].transform.position, trader.transform.position) <= trader.closeDistance) {
+						#if API
 						Undo.RegisterUndo ((Trader)target, "Find post");
+						#endif
+						
 						trader.target = posts [p];
 						trader.transform.position = trader.target.transform.position;
 						find = true;
@@ -51,7 +67,10 @@ public class TraderEditor : Editor
 			else
 				GUI.enabled = true;
 			if (GUILayout.Button (new GUIContent ("Set location", "This will set the location of the trader to be at the location of the selected target post"), EditorStyles.miniButtonRight)) {
+				#if API
 				Undo.RegisterUndo ((Trader)target, "Set location");
+				#endif
+				
 				trader.transform.position = trader.target.transform.position;
 			}
 			GUI.enabled = true;
@@ -125,12 +144,18 @@ public class TraderEditor : Editor
 						EditorGUILayout.BeginHorizontal ();
 						EditorGUILayout.LabelField ("Select factions", EditorStyles.boldLabel);
 						if (GUILayout.Button ("Select all", EditorStyles.miniButtonLeft)) {
+							#if API
 							Undo.RegisterUndo ((Trader)target, "Select all factions");
+							#endif
+							
 							for (int f = 0; f<trader.factions.Count; f++)
 								trader.factions [f] = true;
 						}
 						if (GUILayout.Button ("Select none", EditorStyles.miniButtonRight)) {
+							#if API
 							Undo.RegisterUndo ((Trader)target, "Select no factions");
+							#endif
+							
 							for (int f = 0; f<trader.factions.Count; f++)
 								trader.factions [f] = false;
 						}
@@ -193,3 +218,4 @@ public class TraderEditor : Editor
 		}
 	}
 }
+}//end namespace

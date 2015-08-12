@@ -5,6 +5,8 @@ using System.Linq;
 using System;
 using System.IO;
 
+namespace TradeSys{//uses TradeSys namespace to prevent any conflicts
+
 #region variables
 [System.Serializable]
 public class Goods
@@ -434,24 +436,8 @@ UpdateLists ();
 			traderScripts.Remove (traderScript);
 			Destroy (trader);
 		}
-		if (traderScript.trading.Count > 0){
-			switch(pauseOption){
-			case 0://set time
-				traderScript.stopTime = pauseTime;
-				break;
-			//case 1:trader specific - set on the trader, so is ok
-			case 2://cargo mass
-				traderScript.stopTime = (traderScript.cargoSpace - traderScript.spaceRemaining) * pauseTime;
-				break;
-			case 3://cargo mass specific
-				float stopTime = 0;
-				for(int t = 0; t<traderScript.trading.Count; t++)
-					stopTime += goodsArray[traderScript.trading[t].goodID].pausePerUnit * traderScript.trading[t].number;
-				traderScript.stopTime = stopTime;
-				break;
-			}
+		if (traderScript.trading.Count > 0)
 			traderScript.ExitPause ();
-		}
 	}
 	
 	void ExecuteMove ()
@@ -481,3 +467,4 @@ UpdateLists ();
 		return false;
 	}
 }
+}//end namespace

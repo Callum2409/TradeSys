@@ -2,6 +2,8 @@ using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 
+//This script is not included in the namespace because it only requires a few elements from the namespace, and can also act as an example of how to access information contained within the TradeSys classes
+
 public class Player : MonoBehaviour
 {
 	/*This script is intended to aid the creation of a GUI using TradeSys, so the GUI itself is fairly basuc. 
@@ -12,7 +14,7 @@ public class Player : MonoBehaviour
 	 * 
 	 * Hope this is useful in creating your GUI!
 	*/
-	Controller controller;//this is the controller script, easier to set it as this than using GetComponent each time
+	TradeSys.Controller controller;//this is the controller script, easier to set it as this than using GetComponent each time
 	bool enter, shop, edit;//there is a bool for if it is possible to enter a trade post and if the player is currently 
 	//in the shop. Edit is so that the groups of teh trade post can be changed
 	GameObject nearPost;//needs to know the post that the player is at so can get the correct prices etc
@@ -28,14 +30,14 @@ public class Player : MonoBehaviour
 	Vector2 scrollPos = Vector2.zero;
 	public float saleP = 0.7f;//this is the % of the normal price that the trade post will buy items at. Should be > 0 and < 1
 	internal GameObject focus;//this is set when an object using the HitMe script, or the code within it
-	public float closeDistance = 2f;
+	public float collectionDistance = 2f;
 	Collider[] nearby;
 	string pickup = "";//use this so that if an item is collected, it will be displayed
 	float displayTimer;//used so that after a certain amount of time, the message will go away
 	
 	void Start ()
 	{//set up the variables that will be used throughout
-		controller = GameObject.Find ("Controller").GetComponent<Controller> ();
+		controller = GameObject.Find ("Controller").GetComponent<TradeSys.Controller> ();
 		cargo = new int[controller.goodsArray.Length];
 		//the cargo is stored as an int[] as this makes it easier to get the currently carried cargo
 		spaceRemaining = cargoSpace;//the player at the start is not carrying anything, so the remaining will be 
@@ -75,7 +77,7 @@ public class Player : MonoBehaviour
 	{//needs to go through each trade post, and check the distance, if close, will return true indicating it is near, and will
 		//set nearPost
 		for (int p = 0; p<controller.posts.Count; p++) {
-			if (Vector3.Distance (this.transform.position, controller.posts [p].transform.position) < closeDistance) {//check the distance
+			if (Vector3.Distance (this.transform.position, controller.posts [p].transform.position) < collectionDistance) {//check the distance
 				nearPost = controller.posts [p];//get the correct trade post
 				return true;
 			}
@@ -85,7 +87,7 @@ public class Player : MonoBehaviour
 	
 	void PickupCheck ()
 	{
-		nearby = Physics.OverlapSphere (this.transform.position, closeDistance);//check all items that are within close range
+		nearby = Physics.OverlapSphere (this.transform.position, collectionDistance);//check all items that are within collection range
 		for (int n = 0; n<nearby.Length; n++) {
 			if (nearby [n].tag == "Item") {//need to check that each one is an item
 				int itemNo = controller.spawned.FindIndex (x => x.item == nearby [n].gameObject);//get the location of the spawned item in the spawned list
@@ -112,7 +114,6 @@ public class Player : MonoBehaviour
 	{//changing the font size to make it easier to view
 		GUI.skin.box.fontSize = 42;
 		GUI.skin.label.fontSize = 21;
-		GUI.skin.button.richText = true;
 		#region example code
 		if (enter && !shop && !edit) {//if it is close to a trade post
 			if (GUI.Button (new Rect (Screen.width - 160, 10, 150, 50), "Enter trade post") || Input.GetKeyUp (KeyCode.T)) {
@@ -144,7 +145,7 @@ public class Player : MonoBehaviour
 			GUI.Label (new Rect (Screen.width - 260, 50, 250, 30), "Space remaining: " + System.Math.Ceiling (spaceRemaining));
 			//using System.Math.Ceiling (spaceRemaining) because then doesnt need to show many decimals, and that small 
 			//items e.g. mass 1g do not reduce the space remaining by 1t
-			List<Stock> stock = nearPost.GetComponent<TradePost> ().stock;//get the stock of the trade post so dont have to keep
+			List<TradeSys.Stock> stock = nearPost.GetComponent<TradeSys.TradePost> ().stock;//get the stock of the trade post so dont have to keep
 			//calling this method
 			int showCount = stock.FindAll (x => x.allow == true).Count;//get the number of lines required, so can create a scroll
 			//pane large enough
@@ -183,7 +184,7 @@ public class Player : MonoBehaviour
 							cash -= stock [g].price;//pay for the item
 							cargo [g]++;//add the item to the cargo
 							stock [g].number--;//reduce the number available at the trade post
-							nearPost.GetComponent<TradePost> ().UpdatePrice ();//and update the price of the items at the trade post as is now carrying fewer, so the price may change
+							nearPost.GetComponent<TradeSys.TradePost> ().UpdatePrice ();//and update the price of the items at the trade post as is now carrying fewer, so the price may change
 						}
 					}
 					if (eBS == 2 && GUI.Button (new Rect (1130, s * 30, 50, 30), "Sell")) {//if selling
@@ -192,7 +193,7 @@ public class Player : MonoBehaviour
 							cash += (int)(stock [g].price * saleP);//get paid for the item, but is a proportion of the normal price
 							cargo [g]--;//reduce the number of the cargo
 							stock [g].number++;//increase the stock count at the trade post
-							nearPost.GetComponent<TradePost> ().UpdatePrice ();//now has more items, so the price may change
+							nearPost.GetComponent<TradeSys.TradePost> ().UpdatePrice ();//now has more items, so the price may change
 						}
 					}
 					s++;//increase the value of s, so can display the info on different lines
@@ -214,7 +215,7 @@ public class Player : MonoBehaviour
 						controller.postScripts [p].groups.Add (false);
 				}
 				scrollPos = GUI.BeginScrollView (new Rect (10, 100, Screen.width - 20, Screen.height - 110), scrollPos, new Rect (0, 0, 300, controller.groups.Count * 40));
-				List<bool> groupEnabled = nearPost.GetComponent<TradePost> ().groups;
+				List<bool> groupEnabled = nearPost.GetComponent<TradeSys.TradePost> ().groups;
 				for (int g = 0; g<controller.groups.Count; g++) {
 					controller.groups [g] = GUI.TextField (new Rect (0, g * 40, 250, 30), controller.groups [g]);
 					groupEnabled[g] = GUI.Toggle(new Rect(260, g*40+5, 50, 30), groupEnabled[g], "");
@@ -226,8 +227,8 @@ public class Player : MonoBehaviour
 			if (focus != null && focus.transform.parent.name == "Traders") {
 				GUI.skin.box.fontSize = 23;
 				GUI.Box (new Rect (0, 0, 350, Screen.height), focus.name);//creates a background box which will have the info displayed on
-				Trader trader = focus.GetComponent<Trader> (); //This is getting the trader script of the clicked trader. The focus is just a GameObject
-				List<NoType> rows = trader.trading;//get all of the cargo items to display
+				TradeSys.Trader trader = focus.GetComponent<TradeSys.Trader> (); //This is getting the trader script of the clicked trader. The focus is just a GameObject
+				List<TradeSys.NoType> rows = trader.trading;//get all of the cargo items to display
 				int rowCount = rows.Count;//get the number of rows
 				GUI.Label (new Rect (10, 30, 330, 30), "Target: " + trader.target);//show target, post or item
 				GUI.Label (new Rect (10, 60, 330, 30), "Final Post: " + trader.finalPost);//show final post

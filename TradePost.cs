@@ -3,6 +3,8 @@ using System.Collections;
 using System.Collections.Generic;
 using System;
 
+namespace TradeSys{//uses TradeSys namespace to prevent any conflicts
+
 [System.Serializable]
 public class Stock
 {
@@ -186,3 +188,4 @@ public class TradePost : MonoBehaviour
 		}
 	}
 }
+}//end namespace
