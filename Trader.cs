@@ -6,7 +6,7 @@ using System.Collections.Generic;
 public class NoType
 {
 	public int number;
-	public string type;
+	public int goodID;
 }
 
 public class Trader : MonoBehaviour
@@ -18,8 +18,9 @@ public class Trader : MonoBehaviour
 	public float cargoSpace = 1;
 	internal float spaceRemaining;
 	internal bool allowGo = false;
-	public float speedMultiplier = .5f;
 	Controller controller;
+	
+	public float speedMultiplier = .5f;
 	
 	void Awake ()
 	{
@@ -29,21 +30,23 @@ public class Trader : MonoBehaviour
 		spaceRemaining = cargoSpace;
 	}
 	
-	public void NewTrader (GameObject post, float space)
+	public void NewTrader (GameObject post, float space /*REMOVEME , float stop REMOVE */)
 	{//only called if the trader is created in-game
 		this.gameObject.tag = "Trader";
 		targetPost = post;
 		Awake ();
 		controller.traders.Add (gameObject);
 		cargoSpace = space;
-		//optional set the stopTime
+		//REMOVEME stopTime = stop;
+		
+		//to enable the stopTime to be set, remove the comments with REMOVEME before
 	}
 	
 	void Update ()
 	{
 		if (allowGo && onCall && targetPost != null) {
 			if (onCall) {
-				this.transform.Translate (Vector3.forward * speedMultiplier);
+				this.transform.Translate (Vector3.forward * speedMultiplier * Time.timeScale);
 				this.transform.LookAt (targetPost.transform);
 			}
 			if (Vector3.Distance (this.transform.position, targetPost.transform.position) <= 0.5) 
@@ -71,9 +74,9 @@ public class Trader : MonoBehaviour
 		if (trading.Count > 0) {
 			TradePost tP = targetPost.GetComponent<TradePost> ();
 			for (int t = 0; t<trading.Count; t++) {
-				tP.stock [controller.goods.FindIndex (x => x.name == trading [t].type)].number += trading [t].number;
+				tP.stock [trading[t].goodID].number += trading [t].number;
 				tP.UpdatePrice ();
-				controller.ongoing.RemoveAt (controller.ongoing.FindIndex (x => x.buyPost == targetPost && x.type == trading [t].type));
+				controller.ongoing.RemoveAt (t);
 			}
 			spaceRemaining = cargoSpace;
 			trading.Clear ();
@@ -86,6 +89,5 @@ public class Trader : MonoBehaviour
 		allowGo = false;
 		onCall = false;
 		CheckPause();
-		//StartCoroutine (Pause ());
 	}
 }

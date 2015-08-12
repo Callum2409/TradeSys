@@ -2,7 +2,6 @@ using UnityEngine;
 using UnityEditor;
 using System.Collections;
 using System.Collections.Generic;
-using System;
 
 [CustomEditor(typeof(TradePost)), CanEditMultipleObjects]
 public class PostEditor : Editor
@@ -22,15 +21,48 @@ public class PostEditor : Editor
 		controller.showAG = EditorGUILayout.Foldout (controller.showAG, "Settings");
 		if (controller.showAG) {
 			EditorGUI.indentLevel = 1;
+			EditorGUILayout.BeginHorizontal ();
+			controller.showHoriz = EditorGUILayout.Toggle (new GUIContent ("Show items vertically", "When enabling or disabling " +
+			"items at trade posts, show ascending vertically"), controller.showHoriz);
+			controller.showHoriz = !EditorGUILayout.Toggle (new GUIContent ("Show items horizontally", "When enabling or disabling " +
+			"items at trade posts, show ascending horizontally"), !controller.showHoriz);
+			EditorGUILayout.EndHorizontal ();
+			EditorGUILayout.BeginHorizontal ();
 			EditorGUILayout.LabelField ("Allow item at this post", EditorStyles.boldLabel);
-			for (int a = 0; a<post.allowGoods.Count-1; a = a+2) {
-				EditorGUILayout.BeginHorizontal ();
-				post.allowGoods [a] = EditorGUILayout.Toggle (post.stock [a].name, post.allowGoods [a]);
-				post.allowGoods [a + 1] = EditorGUILayout.Toggle (post.stock [a + 1].name, post.allowGoods [a + 1]);
-				EditorGUILayout.EndHorizontal ();
+			if (GUILayout.Button ("Select all", EditorStyles.miniButtonLeft)) {
+				for (int s = 0; s<post.stock.Count; s++) {
+					post.stock [s].allow = true;
+				}
 			}
-			if (post.allowGoods.Count % 2 == 1)
-				post.allowGoods [post.allowGoods.Count - 1] = EditorGUILayout.Toggle (post.stock [post.allowGoods.Count - 1].name, post.allowGoods [post.allowGoods.Count - 1]);
+			if (GUILayout.Button ("Select none", EditorStyles.miniButtonRight)) {
+				for (int s = 0; s<post.stock.Count; s++) {
+					post.stock [s].allow = false;
+				}
+			}
+			EditorGUILayout.EndHorizontal ();
+			
+			if (!controller.showHoriz) {
+				for (int a = 0; a<post.stock.Count-1; a = a+2) {
+					EditorGUILayout.BeginHorizontal ();
+					post.stock [a].allow = EditorGUILayout.Toggle (post.stock [a].name, post.stock [a].allow);
+					post.stock [a + 1].allow = EditorGUILayout.Toggle (post.stock [a + 1].name, post.stock [a + 1].allow);
+					EditorGUILayout.EndHorizontal ();
+				}
+				if (post.stock.Count % 2 == 1)
+					post.stock [post.stock.Count - 1].allow = EditorGUILayout.Toggle (post.stock [post.stock.Count - 1].name, post.stock [post.stock.Count - 1].allow);
+			} else {
+				int half = Mathf.FloorToInt (post.stock.Count / 2);
+				if (post.stock.Count % 2 == 1)
+					half ++;
+				
+				for (int a = 0; a< half; a++) {
+					EditorGUILayout.BeginHorizontal ();
+					post.stock [a].allow = EditorGUILayout.Toggle (post.stock [a].name, post.stock [a].allow);
+					if (half + a < post.stock.Count)	
+						post.stock [half + a].allow = EditorGUILayout.Toggle (post.stock [half + a].name, post.stock [half + a].allow);
+					EditorGUILayout.EndHorizontal ();
+				}
+			}
 		}
 		
 		EditorGUI.indentLevel = 0;
@@ -40,7 +72,7 @@ public class PostEditor : Editor
 			for (int s = 0; s<post.stock.Count; s++) {
 				EditorGUI.indentLevel = 1;
 				
-				if (post.allowGoods [s]) {
+				if (post.stock [s].allow) {
 					EditorGUILayout.BeginHorizontal ();
 					EditorGUILayout.LabelField (post.stock [s].name, EditorStyles.boldLabel);
 				
@@ -87,7 +119,7 @@ public class PostEditor : Editor
 	bool Check (List<NeedMake> mnfctr)
 	{
 		for (int i = 0; i<mnfctr.Count; i++) {
-			if (!post.allowGoods [mnfctr [i].item])
+			if (!post.stock [mnfctr [i].item].allow)
 				return false;
 		}
 		return true;

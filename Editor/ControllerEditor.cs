@@ -31,28 +31,23 @@ public class ControllerEditor : Editor
 		for (int p = 0; p<posts.Length; p++) {
 			TradePost post = posts[p].GetComponent<TradePost>();
 			while (post.stock.Count != controller.goods.Count) {
-				if (post.stock.Count > controller.goods.Count) 
+				if (post.stock.Count > controller.goods.Count) {
 					post.stock.RemoveAt (post.stock.Count - 1);
-				else 
-					post.stock.Add (new Stock{name = controller.goods [post.stock.Count].name});
-			}
-			while (post.allowGoods.Count != controller.goods.Count) {
-				if (post.allowGoods.Count > controller.goods.Count) 
-					post.allowGoods.RemoveAt (post.allowGoods.Count - 1);
-				else
-					post.allowGoods.Add (true);
+				} else {
+					post.stock.Add (new Stock{name = "Name", allow = true});
+				}
 			}
 		}
 	}
 	
 	public override void OnInspectorGUI ()
 	{
-		#region show expendable traders array
-		controller.settings = EditorGUILayout.Foldout (controller.settings, "Settings");
+		#region settings
+		controller.settings = EditorGUILayout.Foldout (controller.settings, "Settings");		
+		EditorGUI.indentLevel = 1;
 		
-		if (controller.settings) {
-			EditorGUI.indentLevel = 1;
-			
+		if (controller.settings) {		
+		#region expendable traders
 			controller.expendable = EditorGUILayout.Toggle ("Expendable traders", controller.expendable);
 			
 			if (controller.expendable) {
@@ -71,9 +66,7 @@ public class ControllerEditor : Editor
 					controller.showE = true;
 				}
 				EditorGUILayout.EndHorizontal ();
-			}	
-			
-			if (controller.expendable) {
+
 				controller.showE = EditorGUILayout.Foldout (controller.showE, "Expendable trader types");
 				if (controller.showE) {
 					EditorGUI.indentLevel = 3;
@@ -94,13 +87,70 @@ public class ControllerEditor : Editor
 				}
 			}
 			GUI.enabled = true;
+			#endregion
+			#region units
+			EditorGUI.indentLevel = 1;
+			controller.showAllU = EditorGUILayout.Foldout (controller.showAllU, "Units");
+			if (controller.showAllU) {
+				if (GUILayout.Button ("Add", EditorStyles.miniButton)) {
+					Undo.RegisterUndo ((Controller)target, "Add new unit");
+					controller.units.Add (new Unit{suffix = "New unit", max = Mathf.Infinity, min = 0.000001f});
+				}
+				for (int u = 0; u<controller.units.Count; u++) {
+					Unit cur = controller.units [u];
+					EditorGUI.indentLevel = 2;
+					
+					EditorGUILayout.BeginHorizontal ();
+					cur.suffix = EditorGUILayout.TextField ("Unit suffix", cur.suffix);
+					if (GUILayout.Button ("X", EditorStyles.miniButton, GUILayout.MaxWidth (20f))) {
+						Undo.RegisterUndo ((Controller)target, "Remove unit");
+						controller.units.RemoveAt (u);
+					}
+					EditorGUILayout.EndHorizontal ();
+					
+					EditorGUI.indentLevel = 3;
+					EditorGUILayout.BeginHorizontal ();
+					cur.min = EditorGUILayout.FloatField ("Min", cur.min);
+					cur.max = EditorGUILayout.FloatField ("Max", cur.max);
+					EditorGUILayout.EndHorizontal ();
+					
+					if (cur.suffix.Length == 0)
+						cur.suffix = "New unit";
+					cur.min = Mathf.Max (cur.min, 0.000001f);
+					cur.max = Mathf.Max (cur.max, 0.000001f, cur.min);
+					
+					for (int g = 0; g< controller.goods.Count; g++)
+						SetUnit (g);
+				}
+				EditorGUI.indentLevel = 2;
+				if (CheckOverlap ()) 
+					EditorGUILayout.HelpBox ("There is overlap between some of the units.\nMake sure that there are " +
+							"no unis with an overlap.", MessageType.Warning);
+				if (!CheckInfinity () && controller.units.Count > 0)
+					EditorGUILayout.HelpBox ("None of your units extend to ininity. As a result, some items may not have " +
+						"any units. To extend to infinity, type infinity into the max field.", MessageType.Warning);
+			}
 		}
 		#endregion
-		#region show goods
+		#endregion
+		#region goods
 		EditorGUI.indentLevel = 0;
 		controller.showAllG = EditorGUILayout.Foldout (controller.showAllG, "Goods");
-		if (controller.showAllG) {
+		if (controller.showAllG) {			
+			EditorGUILayout.BeginHorizontal ();
+			EditorGUI.indentLevel = 1;
 			EditorGUILayout.LabelField ("Number of types", controller.goods.Count.ToString ());
+			
+			GUIEnable (controller.goods.Count);
+			if (GUILayout.Button ("Expand all", EditorStyles.miniButtonLeft)) {
+				ExpandCollapse (controller.showSmallG, true);
+			}
+			if (GUILayout.Button ("Collapse all", EditorStyles.miniButtonRight)) {
+				ExpandCollapse (controller.showSmallG, false);
+			}
+			GUI.enabled = true;
+			EditorGUILayout.EndHorizontal ();
+			
 			for (int g = 0; g < controller.goods.Count; g++) {
 				EditorGUI.indentLevel = 1;
 				string name = controller.goods [g].name;
@@ -118,6 +168,7 @@ public class ControllerEditor : Editor
 						controller.showSmallG.Insert (g, false);
 						controller.allNames.Insert (g, "Name");	
 						ChangeFromPoint (g - 1, true);
+						AddStock (g);
 					}
 					if (GUILayout.Button ("Remove", EditorStyles.miniButtonMid)) {
 						Undo.RegisterUndo ((Controller)target, "Remove " + controller.allNames [g]);
@@ -126,6 +177,9 @@ public class ControllerEditor : Editor
 						controller.allNames.RemoveAt (g);
 						ChangeFromPoint (g - 1, false);
 						CheckManufacturing ();
+						for (int p = 0; p< posts.Length; p++) {
+							posts [p].GetComponent<TradePost> ().stock.RemoveAt (g);
+						}
 						break;
 					}
 					if (GUILayout.Button ("Add after", EditorStyles.miniButtonRight)) {
@@ -134,12 +188,16 @@ public class ControllerEditor : Editor
 						controller.showSmallG.Insert (g + 1, false);
 						controller.allNames.Insert (g + 1, "Name");
 						ChangeFromPoint (g, true);
+						AddStock (g + 1);
 					}
 					EditorGUILayout.EndHorizontal ();
 					
 					EditorGUILayout.BeginHorizontal ();
 					name = EditorGUILayout.TextField ("Name", name);
-					controller.goods [g].mass = Mathf.Clamp (EditorGUILayout.FloatField ("Mass", controller.goods [g].mass), 0.000001f, Mathf.Infinity);
+					string unit = "";
+					if (controller.units.Count > 0 && controller.goods [g].unit < controller.units.Count)
+						unit = " (" + controller.units [controller.goods [g].unit].suffix + ")";
+					controller.goods [g].mass = Mathf.Clamp (EditorGUILayout.FloatField ("Mass" + unit, controller.goods [g].mass), 0.000001f, Mathf.Infinity);
 					controller.goods [g].name = name;
 					EditorGUILayout.EndHorizontal ();
 					
@@ -162,6 +220,7 @@ public class ControllerEditor : Editor
 					controller.goods [g].minPrice = (int)Mathf.Clamp (controller.goods [g].minPrice, 0, controller.goods [g].basePrice);
 					controller.goods [g].maxPrice = (int)Mathf.Clamp (controller.goods [g].maxPrice, controller.goods [g].basePrice, Mathf.Infinity);
 					
+					SetUnit (g);
 				}
 				
 			}//end for all
@@ -170,16 +229,33 @@ public class ControllerEditor : Editor
 					controller.showSmallG.Add (true);
 					controller.goods.Add (new Goods{name = "Name", basePrice = 0, minPrice = 0, maxPrice = 0, mass = 1});
 					controller.allNames.Add ("Name");
+					AddStock(0);
 				}
 			}
 				
 		}//end if showing goods
 		#endregion
-		#region show manufacturing
+		#region manufacturing
 		EditorGUI.indentLevel = 0;
 		controller.showAllM = EditorGUILayout.Foldout (controller.showAllM, "Manufacturing");
 		if (controller.showAllM) {
-			if (GUILayout.Button ("Add")) {
+			EditorGUI.indentLevel = 1;
+			
+			EditorGUILayout.BeginHorizontal ();
+			EditorGUILayout.LabelField ("Number of types", controller.manufacturing.Count.ToString ());
+			
+			GUIEnable (controller.manufacturing.Count);
+			if (GUILayout.Button ("Expand all", EditorStyles.miniButtonLeft)) {
+				ExpandCollapse (controller.showSmallM, true);
+			}
+			if (GUILayout.Button ("Collapse all", EditorStyles.miniButtonRight)) {
+				ExpandCollapse (controller.showSmallM, false);
+			}
+			GUI.enabled = true;
+			EditorGUILayout.EndHorizontal ();
+			
+			EditorGUILayout.BeginHorizontal ();
+			if (GUILayout.Button ("Add", EditorStyles.miniButtonLeft)) {
 				Undo.RegisterUndo ((Controller)target, "Add new manufacturing process");
 				controller.showSmallM.Add (false);
 				if (controller.manufacturing.Count == 0)
@@ -188,6 +264,38 @@ public class ControllerEditor : Editor
 					Debug.LogError ("There are no possible types to manufacture\nAdd some types to goods");
 				controller.manufacturing.Add (new Items{name = "", needing = new List<NeedMake> (), making = new List<NeedMake> ()});
 			}
+			
+			GUIEnable (controller.manufacturing.Count);
+			if (GUILayout.Button ("Check", EditorStyles.miniButtonRight)) {				
+				float[] inf = new float[controller.goods.Count];
+				for (int p = 0; p<posts.Length; p++) {
+					for (int m = 0; m<controller.manufacturing.Count; m++) {
+						TradePost post = posts [p].GetComponent<TradePost> ();
+						if (post.manufacture [m].yesNo) {
+							for (int i = 0; i<controller.manufacturing[m].needing.Count; i++) 
+								inf [controller.manufacturing [m].needing [i].item] -= (controller.manufacturing [m].needing [i].number / (post.manufacture [m].seconds * 1f));
+							for (int i = 0; i<controller.manufacturing[m].making.Count; i++) 
+								inf [controller.manufacturing [m].making [i].item] += (controller.manufacturing [m].making [i].number / (post.manufacture [m].seconds * 1f));
+						}
+					}
+				}
+				string show = "NOTE: This can only act as a guide because there may be pauses in manufacturing if there " +
+					"are not enough items, so there will be some variances.\n\n" +
+					"It is useful to give an idea of whether the number of each item is expected to increase, decrease " +
+					"or stay the same as time tends to infinity. A larger number means that it will increase or decrease faster.\n";
+				for (int g = 0; g<controller.goods.Count; g++) {
+					show += "\n" + controller.goods [g].name + " ";
+					if (inf [g] > 0)
+						show += "increase ("+inf[g].ToString("f2")+")";
+					else if (inf [g] == 0)
+						show += "same";
+					else
+						show += "decrease ("+Mathf.Abs(inf[g]).ToString("f2")+")";
+				}
+				EditorUtility.DisplayDialog ("Checking manufacturing", show, "Ok");	
+			}
+			EditorGUILayout.EndHorizontal ();
+			GUI.enabled = true;
 			
 			for (int m = 0; m < controller.manufacturing.Count; m++) {
 				EditorGUI.indentLevel = 1;
@@ -267,15 +375,6 @@ public class ControllerEditor : Editor
 		if (GUI.changed) {//get changes so can update other scripts
 			for (int p = 0; p<posts.Length; p++) {
 				TradePost post = posts [p].GetComponent<TradePost> ();
-				while (post.stock.Count != controller.goods.Count) {
-					if (post.stock.Count > controller.goods.Count) {
-						post.stock.RemoveAt (post.stock.Count - 1);
-						post.allowGoods.RemoveAt (post.stock.Count - 1);
-					} else {
-						post.stock.Add (new Stock{});
-						post.allowGoods.Add (true);
-					}
-				}
 				
 				while (post.manufacture.Count != controller.manufacturing.Count) {
 					if (post.manufacture.Count > controller.manufacturing.Count)
@@ -284,6 +383,7 @@ public class ControllerEditor : Editor
 						post.manufacture.Add (new Mnfctr{yesNo = false, seconds = 1});
 				}
 				
+//				Debug.Log("post: "+posts[p].name+"\nstock length: "+post.stock.Count+"\ncontroller goods length: "+controller.goods.Count);
 				for (int x = 0; x<controller.goods.Count; x++) {
 					post.stock [x].name = controller.goods [x].name;
 					controller.allNames [x] = controller.goods [x].name;
@@ -306,16 +406,12 @@ public class ControllerEditor : Editor
 				if (controller.manufacturing [m].making [c].item > point)
 					controller.manufacturing [m].making [c].item += increment;
 		}
-		
-		for (int p = 0; p < posts.Length; p++) {
-			TradePost postScript = posts [p].GetComponent<TradePost> ();
-			if (increase) {
-				postScript.stock.Insert (point + 1, new Stock{name = "Name"});
-				postScript.allowGoods.Insert (point + 1, true);
-			} else {
-				postScript.stock.RemoveAt (point + 1);
-				postScript.allowGoods.RemoveAt (point + 1);
-			}
+	}
+	
+	void AddStock (int point)
+	{
+		for (int p = 0; p< posts.Length; p++) {
+			posts [p].GetComponent<TradePost> ().stock.Insert (point, new Stock{name = "Name", allow = true});
 		}
 	}
 	
@@ -349,5 +445,47 @@ public class ControllerEditor : Editor
 			}					
 		}
 		return false;
+	}
+	
+	void ExpandCollapse (List<bool> list, bool ec)
+	{
+		for (int l = 0; l<list.Count; l++) {
+			list [l] = ec;
+		}
+	}
+	
+	bool CheckOverlap ()
+	{
+		for (int u = 0; u<controller.units.Count; u++) {
+			for (int v = 0; v<controller.units.Count; v++) {
+				if (u != v && controller.units [u].min < controller.units [v].max && controller.units [u].min >= controller.units [v].min)
+					return true;
+			}
+		}
+		return false;
+	}
+	
+	bool CheckInfinity ()
+	{
+		for (int u = 0; u<controller.units.Count; u++) {
+			if (controller.units [u].max == Mathf.Infinity)
+				return true;
+		}
+		return false;
+	}
+	
+	void SetUnit (int goodID)
+	{
+		for (int u = 0; u<controller.units.Count; u++) {
+			if (controller.goods [goodID].mass >= controller.units [u].min && controller.goods [goodID].mass < controller.units [u].max)
+				controller.goods [goodID].unit = u;
+		}
+	}
+	
+	void GUIEnable(int count){
+		if (count > 0)
+			GUI.enabled = true;
+		else
+			GUI.enabled = false;
 	}
 }

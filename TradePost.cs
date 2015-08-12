@@ -8,6 +8,7 @@ public class Stock
 	public string name;
 	public int number;
 	public int price;
+	public bool allow = true;
 }
 
 [System.Serializable]
@@ -23,7 +24,6 @@ public class TradePost : MonoBehaviour
 	public List<Mnfctr> manufacture = new List<Mnfctr> ();
 	Controller controller;
 	float[] times;
-	public List<bool> allowGoods = new List<bool>();
 	
 	void Start ()
 	{
@@ -47,16 +47,20 @@ public class TradePost : MonoBehaviour
 		}
 	}
 	
-	public void NewPost (int[] manufactureTimes)
+	public void NewPost (int[] itemNumbers, int[] manufactureTimes)
 	{//only used if it is a new trading post
 		controller = GameObject.Find ("Controller").GetComponent<Controller> ();
 		Start ();
+		if (itemNumbers.Length != controller.goods.Count)
+			Debug.LogError ("Please ensure that the item numbers sent to the new trade post is the correct length\nIt needs to have a value for each item. set as -1 to disable an item.");
 		for (int g = 0; g<controller.goods.Count; g++) {
-			int number = (int)(Random.value * 30);
-			stock.Add (new Stock{name = controller.goods [g].name, number = number});
-			controller.UpdateAverage (g);
+			if (itemNumbers [g] == -1)
+				stock.Add (new Stock{name = controller.goods [g].name, number = 0, allow = false});
+			else {
+				stock.Add (new Stock{name = controller.goods [g].name, number = itemNumbers[g], allow = true});
+				controller.UpdateAverage (g, itemNumbers[g], 1);
+			}
 		}
-		UpdatePrice ();
 		if (manufactureTimes.Length != controller.manufacturing.Count)
 			Debug.LogError ("Please ensure that the manufacture times sent to the new trade post is the correct length\nIt needs to have a value for each manufacturing process");
 		else {
@@ -104,11 +108,53 @@ public class TradePost : MonoBehaviour
 			int index = goods [x].item;
 			if (need) {
 				stock [index].number -= goods [x].number;
-				controller.UpdateAverage (index);
+				controller.UpdateAverage (index, -goods [x].number, 0);
 			} else {
 				stock [index].number += goods [x].number;
-				controller.UpdateAverage (index);
+				controller.UpdateAverage (index, goods [x].number, 0);
 			}
+		}
+	}
+	
+	public void PostEnableDisable (bool enable)
+	{//this is used to disable a post, or enable a post that has previously been enabled.
+		//If the post has not been enabled, then the NewPost method should be called instead
+		int mult = 1;
+		if (enable)
+			controller.posts.Add (this.gameObject);
+		else {
+			mult = -1;
+			controller.posts.Remove(this.gameObject);
+		}
+		
+		for (int s = 0; s<stock.Count; s++) {
+			if (stock [s].allow)
+				controller.UpdateAverage (s, mult * stock [s].number, mult);
+		}
+	}
+	
+	public void ItemEnableDisable (bool enable, int productID)
+	{
+		if (productID > stock.Count - 1) 
+			Debug.LogError ("The productID is greater than the number of items available.\nMake sure that the productID is correct.");
+		else {
+			if (stock [productID].allow != enable) {
+				if (enable) 
+					controller.UpdateAverage (productID, stock [productID].number, +1);
+				else 
+					controller.UpdateAverage (productID, -stock [productID].number, -1);
+				stock [productID].allow = enable;
+			}
+		}
+	}
+	
+	public void ManufactureEnableDisable (bool enable, int manufactureID, int time)
+	{
+		if (manufactureID > controller.manufacturing.Count - 1)
+			Debug.LogError ("The manufactureID is greater than the number of manufactureing processes set up.\nMake sure that the manufactureID is correct.");
+		else {		
+			manufacture [manufactureID].yesNo = enable;
+			manufacture [manufactureID].seconds = time;
 		}
 	}
 }

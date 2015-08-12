@@ -11,7 +11,9 @@ public class Goods
 	public int minPrice;
 	public int maxPrice;
 	public float mass;
-	public int average;
+	public float average;
+	public int unit;
+	public int postCount;
 }
 
 [System.Serializable]
@@ -19,7 +21,7 @@ public class Trade
 {
 	public GameObject postA;
 	public GameObject postB;
-	public string type;
+	public int typeID;
 }
 
 [System.Serializable]
@@ -28,7 +30,7 @@ public class Trading
 	public GameObject sellPost;
 	public GameObject buyPost;
 	public int number;
-	public string type;
+	public int typeID;
 }
 
 [System.Serializable]
@@ -54,6 +56,14 @@ public class Items
 	public List<NeedMake> making;
 }
 
+[System.Serializable]
+public class Unit
+{
+	public string suffix;
+	public float min;
+	public float max;
+}
+
 public class Controller : MonoBehaviour
 {
 	#region initialize
@@ -71,10 +81,11 @@ public class Controller : MonoBehaviour
 	List<Poss> poss = new List<Poss> ();
 	internal List<Trade> moving = new List<Trade> ();
 	public List<Items> manufacturing = new List<Items> ();
-	public bool showAllG, showAllM, showS, showM, showP, showAG;
+	public bool showAllG, showAllM, showS, showM, showP, showAG, showAllU, showHoriz;
 	public List<bool> showSmallG = new List<bool> ();
 	public List<bool> showSmallM = new List<bool> ();
 	public List<string> allNames;
+	public List<Unit> units;
 	#endregion
 	
 	void Awake ()
@@ -95,26 +106,29 @@ public class Controller : MonoBehaviour
 		TradeCall ();
 	}
 	
-	public void UpdateAverage (int productID)
-	{	
-		Average (productID);
+	public void UpdateAverage (int productID, int changeI, int changeP)
+	{
+		goods [productID].average = ((goods [productID].average * goods [productID].postCount + changeI) / (goods [productID].postCount+ changeP));
+		goods[productID].postCount += changeP;
 		UpdateLists ();
 		for (int p = 0; p<posts.Count; p++)
 			posts [p].GetComponent<TradePost> ().UpdatePrice ();
 	}
 	
 	void Average (int productID)
-	{
+	{//can only be called once at the start because does not include what is being carried
 		int total = 0;
 		int stocked = 0;
 		for (int p = 0; p<posts.Count; p++) {
 			TradePost postScript = posts [p].GetComponent<TradePost> ();
-			if (postScript.allowGoods [productID]) {
+			if (postScript.stock [productID].allow) {
 				total += posts [p].GetComponent<TradePost> ().stock [productID].number;
 				stocked++;
 			}
 		}
-		goods [productID].average = total / stocked;
+		goods [productID].postCount = stocked;
+		if (total > 0)
+			goods [productID].average = total / (stocked*1f);
 	}
 	
 	void UpdateLists ()
@@ -125,16 +139,16 @@ public class Controller : MonoBehaviour
 				TradePost post = posts [p].GetComponent<TradePost> ();
 				
 				if (post.stock [g].number > Mathf.RoundToInt (goods [g].average * 1.5f) && 
-					!sell.Exists (x => x.postA == posts [p] && x.type == goods [g].name) && post.allowGoods[g]) 
-					sell.Add (new Trade{postA = posts [p], type = goods [g].name});
+					!sell.Exists (x => x.postA == posts [p] && x.typeID == g) && post.stock[g].allow) 
+					sell.Add (new Trade{postA = posts [p], typeID = g});
 				if (Mathf.RoundToInt (post.stock [g].number * 1.5f) < goods [g].average && 
-					!buy.Exists (x => x.postA == posts [p] && x.type == goods [g].name) && post.allowGoods[g]) 
-					buy.Add (new Trade{postA = posts [p], type = goods [g].name});
+					!buy.Exists (x => x.postA == posts [p] && x.typeID == g) && post.stock[g].allow) 
+					buy.Add (new Trade{postA = posts [p], typeID = g});
 			}
 			#endregion
 			#region remove from lists
 			for (int s = 0; s < sell.Count; s++) {
-				if (sell [s].type == goods [g].name && 
+				if (sell [s].typeID == g && 
 				!(sell [s].postA.GetComponent<TradePost> ().stock [g].number > Mathf.RoundToInt (goods [g].average * 1.5f))) {
 					sell.RemoveAt (s);
 					break;
@@ -142,7 +156,7 @@ public class Controller : MonoBehaviour
 			}
 		
 			for (int b = 0; b < buy.Count; b++) {
-				if (buy [b].type == goods [g].name && 
+				if (buy [b].typeID == g && 
 					!(Mathf.RoundToInt (buy [b].postA.GetComponent<TradePost> ().stock [g].number * 1.5f) < goods [g].average)) {
 					buy.RemoveAt (b);
 					break;
@@ -151,7 +165,7 @@ public class Controller : MonoBehaviour
 			#endregion
 			#region remove compare
 			for (int c = 0; c< compare.Count; c++) {
-				if (compare [c].type == goods [g].name &&
+				if (compare [c].typeID == g &&
 					(!(compare [c].postA.GetComponent<TradePost> ().stock [g].number > Mathf.RoundToInt (goods [g].average * 1.5f)) ||
 					 !(Mathf.RoundToInt (compare [c].postB.GetComponent<TradePost> ().stock [g].number * 1.5f) < goods [g].average))) {
 					compare.RemoveAt (c);
@@ -163,10 +177,10 @@ public class Controller : MonoBehaviour
 		#region add to compare
 		for (int s=0; s<sell.Count; s++) {
 			for (int b = 0; b<buy.Count; b++) {
-				if (sell [s].type == buy [b].type &&
-					!compare.Exists (x => x.postA == sell [s].postA && x.postB == buy [b].postA && x.type == sell [s].type) &&
-					CheckLocation (sell [s].postA, buy [b].postA, sell [s].type)) {
-					compare.Add (new Trade{postA = sell [s].postA, postB = buy [b].postA, type = sell [s].type});
+				if (sell [s].typeID == buy [b].typeID &&
+					!compare.Exists (x => x.postA == sell [s].postA && x.postB == buy [b].postA && x.typeID == sell [s].typeID) &&
+					CheckLocation (sell [s].postA, buy [b].postA, sell [s].typeID)) {
+					compare.Add (new Trade{postA = sell [s].postA, postB = buy [b].postA, typeID = sell [s].typeID});
 					
 				}
 			}
@@ -174,10 +188,10 @@ public class Controller : MonoBehaviour
 		#endregion
 	}
 	
-	bool CheckLocation (GameObject check, GameObject buyPost, string type)
+	bool CheckLocation (GameObject check, GameObject buyPost, int typeID)
 	{
 		for (int x = 0; x< compare.Count; x++) {
-			if (compare [x].type == type && compare [x].postB == buyPost) {
+			if (compare [x].typeID == typeID && compare [x].postB == buyPost) {
 				if (Vector3.Distance (check.transform.position, buyPost.transform.position) >= 
 					Vector3.Distance (compare [x].postA.transform.position, buyPost.transform.position))
 					return false;
@@ -197,7 +211,7 @@ public class Controller : MonoBehaviour
 		if (expendable) {
 			for (int c = 0; c<compare.Count; c++) {
 				List<Trade> sameLocations = compare.FindAll (x => x.postA == compare [c].postA && x.postB == compare [c].postB);
-				if (!ongoing.Exists (x => x.buyPost == compare [c].postB && x.type == compare [c].type))
+				if (!ongoing.Exists (x => x.buyPost == compare [c].postB && x.typeID == compare [c].typeID))
 					TraderSet (null, sameLocations, c);
 			}
 		} else {
@@ -215,7 +229,7 @@ public class Controller : MonoBehaviour
 						#endregion
 					} else {//end if post not in compare => need to move to new post
 						for (int c = 0; c<compare.Count; c++) {
-							if (!ongoing.Exists (x => x.buyPost == compare [c].postB && x.type == compare [c].type) && !moving.Exists (x => x.postB == compare [c].postA)) {
+							if (!ongoing.Exists (x => x.buyPost == compare [c].postB && x.typeID == compare [c].typeID) && !moving.Exists (x => x.postB == compare [c].postA)) {
 								float distance = Vector3.Distance (traderScript.targetPost.transform.position, compare [c].postA.transform.position);
 								if ((distance < shortest || shortest == 0)) {//check distances
 									if (!poss.Exists (x => x.cNo == c)) {//check that compare has not previously been added
@@ -268,26 +282,25 @@ public class Controller : MonoBehaviour
 		Trader traderScript = trader.GetComponent<Trader> ();
 		
 		for (int a = 0; a < sameLocations.Count; a++) {
-			if (!ongoing.Exists (x => x.buyPost == sameLocations [a].postB && x.type == sameLocations [a].type)) {
+			if (!ongoing.Exists (x => x.buyPost == sameLocations [a].postB && x.typeID == sameLocations [a].typeID)) {
 				
 				TradePost postA = sameLocations [a].postA.GetComponent<TradePost> ();
 						
-				int goodsNo = goods.FindIndex (x => x.name == sameLocations [a].type);
+				int goodsNo = sameLocations[a].typeID;
 						
-				int average = goods [goodsNo].average;
+				float average = goods [goodsNo].average;
 				int sellQuantity = postA.stock [goodsNo].number - Mathf.RoundToInt (average * 1.5f);
-				int buyQuantity = average - Mathf.RoundToInt (compare [c].postB.GetComponent<TradePost> ().stock [goodsNo].number * 1.5f);				
+				int buyQuantity = Mathf.RoundToInt(average - (compare [c].postB.GetComponent<TradePost> ().stock [goodsNo].number * 1.5f));				
 				int quantity = (int)Mathf.Min ((int)((sellQuantity + buyQuantity) / 1.5f), Mathf.Floor (traderScript.spaceRemaining / goods [goodsNo].mass));
 
 				if (quantity > 0) {
 					postA.stock [goodsNo].number -= quantity;
-					postA.UpdatePrice ();
 							
-					ongoing.Add (new Trading{sellPost = sameLocations [a].postA, buyPost = sameLocations [a].postB, number = quantity, type = sameLocations [a].type});
+					ongoing.Add (new Trading{sellPost = sameLocations [a].postA, buyPost = sameLocations [a].postB, number = quantity, typeID = sameLocations [a].typeID});
 						
 					traderScript.onCall = true;
-					traderScript.trading.Add (new NoType{number = quantity, type = sameLocations [a].type});
-					traderScript.spaceRemaining = traderScript.cargoSpace - quantity * goods [goodsNo].mass;
+					traderScript.trading.Add (new NoType{number = quantity, goodID = sameLocations [a].typeID});
+					traderScript.spaceRemaining -= quantity * (float)goods [goodsNo].mass;
 					traderScript.targetPost = sameLocations [a].postB;
 					sameLocations [a].postA.GetComponent<TradePost> ().UpdatePrice ();
 					if (traderScript.spaceRemaining == 0)
@@ -306,7 +319,7 @@ public class Controller : MonoBehaviour
 				Trader traderScript = traders [poss [p].tNo].GetComponent<Trader> ();
 				GameObject targetPost = compare [poss [p].cNo].postA;
 				
-				moving.Add (new Trade{postA = traderScript.targetPost, postB = targetPost, type = traderScript.name});
+				moving.Add (new Trade{postA = traderScript.targetPost, postB = targetPost});
 				traderScript.targetPost = targetPost;
 				traderScript.onCall = true;
 			}
