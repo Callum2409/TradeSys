@@ -215,7 +215,7 @@ namespace TradeSys
 					#region trade
 								if (GUITools.TitleGroup (new GUIContent ("Trade options", "These affect how the trader destination post is decided"), controllerSO.FindProperty ("traOp"), false)) {//show trade options
 										EditorGUILayout.BeginHorizontal ();
-										EditorGUILayout.PropertyField (closestPosts, new GUIContent ("Closest posts", "The number of closest posts that should be taken into account for finding the best post to go to. Decrease this value to improve performance"));
+										EditorGUILayout.PropertyField (closestPosts, new GUIContent ("Closest posts", "The number of closest posts that should be taken into account for finding the best post to go to. Decrease this value to improve performance. Set to 0 for all"));
 										EditorGUILayout.LabelField ("");
 										EditorGUILayout.EndHorizontal ();
 			
@@ -246,8 +246,8 @@ namespace TradeSys
 										EditorGUILayout.PropertyField (priceUpdates, new GUIContent ("Update prices", "Update the prices of the item after each individual item has been purchased"));
 			
 										//make sure that the values never go below minimum
-										if (closestPosts.intValue < 1)
-												closestPosts.intValue = 1;
+										if (closestPosts.intValue < 0)
+												closestPosts.intValue = 0;
 			
 										if (buyMultiple.floatValue < 1)
 												buyMultiple.floatValue = 1;
@@ -511,6 +511,9 @@ namespace TradeSys
 										currentGood.FindPropertyRelative ("expanded").boolValue = GUITools.TitleButton (new GUIContent (currentGood.FindPropertyRelative ("name").stringValue, ""), currentGood.FindPropertyRelative ("expanded"), "ControlLabel");
 					
 										GUILayout.FlexibleSpace ();//used so options are all at the end
+										
+										EditorGUILayout.LabelField (new GUIContent (selGG.intValue.ToString () + " : " + g, "groupID : itemID"), GUILayout.MaxWidth (50f));//display the groupID and itemID
+										
 										GUI.enabled = g > 0 && !Application.isPlaying;//disable move up if already at the top
 										EditorGUILayout.BeginVertical ();//vertical to make the set of buttons central vertically
 										GUILayout.Space (1f);//the space
@@ -746,6 +749,9 @@ namespace TradeSys
 										currentManufacture.FindPropertyRelative ("expanded").boolValue = GUITools.TitleButton (new GUIContent (currentManufacture.FindPropertyRelative ("name").stringValue, currentManufacture.FindPropertyRelative ("tooltip").stringValue), currentManufacture.FindPropertyRelative ("expanded"), "ControlLabel");
 
 										GUILayout.FlexibleSpace ();//used so options are all at the end
+										
+										EditorGUILayout.LabelField (new GUIContent (selMG.intValue.ToString () + " : " + m, "groupID : itemID"), GUILayout.MaxWidth (50f));//display the groupID and itemID
+					
 										GUI.enabled = m > 0 && !Application.isPlaying;//disable move up if already at the top
 										EditorGUILayout.BeginVertical ();//vertical to make the set of buttons central vertically
 										GUILayout.Space (1f);//the space
@@ -793,8 +799,8 @@ namespace TradeSys
 												EditorGUI.indentLevel = 1;
 												EditorGUILayout.PropertyField (currentManufacture.FindPropertyRelative ("name"), new GUIContent ("Name", "This is the name of the process"));
 
-												controllerNormal.ManufactureMass();
-												EditorGUILayout.LabelField (new GUIContent (UnitString(currentManufacture.FindPropertyRelative("needingMass").floatValue, false) + " ► " + UnitString(currentManufacture.FindPropertyRelative("makingMass").floatValue, false),
+												controllerNormal.ManufactureMass ();
+												EditorGUILayout.LabelField (new GUIContent (UnitString (currentManufacture.FindPropertyRelative ("needingMass").floatValue, false) + " ► " + UnitString (currentManufacture.FindPropertyRelative ("makingMass").floatValue, false),
 						                                            "Shows the mass conversion of the needing and making items"));
 														
 												EditorGUI.indentLevel = 1;

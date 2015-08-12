@@ -28,16 +28,16 @@ namespace TradeSys
 				public void EnableDisable (SerializedProperty toChange, string enabled, bool enabledString)
 				{//have option to enable or disable anything displayed
 						GUILayout.FlexibleSpace ();
-						EditorGUILayout.BeginVertical();
-						GUILayout.Space(0f);
-						EditorGUILayout.BeginHorizontal();
+						EditorGUILayout.BeginVertical ();
+						GUILayout.Space (0f);
+						EditorGUILayout.BeginHorizontal ();
 						if (GUILayout.Button ("Select all", EditorStyles.miniButtonLeft))
 								EnableDisable (toChange, true, enabled, enabledString);
 						if (GUILayout.Button ("Select none", EditorStyles.miniButtonRight))
 								EnableDisable (toChange, false, enabled, enabledString);
 						EditorGUILayout.EndHorizontal ();
-						EditorGUILayout.EndVertical();
-						EditorGUILayout.EndHorizontal();
+						EditorGUILayout.EndVertical ();
+						EditorGUILayout.EndHorizontal ();
 				}//end EnableDisable for single option
 	
 				public void EnableDisable (SerializedProperty toChange, string[] enabled, bool enabledString)
@@ -285,7 +285,7 @@ namespace TradeSys
 				{//the title button to show or hide a group
 						EditorGUILayout.BeginVertical ();
 						GUILayout.Space (1f);
-						if (GUILayout.Button (title, style, GUILayout.MaxWidth(146f))) {
+						if (GUILayout.Button (title, style, GUILayout.MaxWidth (146f))) {
 								toggle.boolValue = !toggle.boolValue;
 								GUIUtility.keyboardControl = 0;
 						}
@@ -385,17 +385,17 @@ namespace TradeSys
 												EditorGUILayout.BeginHorizontal ();
 												EditorGUI.indentLevel = 0;
 						
-						SerializedProperty cManEn = cManG.FindPropertyRelative ("enabled");
+												SerializedProperty cManEn = cManG.FindPropertyRelative ("enabled");
 						
-					if(TitleButton(new GUIContent(cManGC.FindPropertyRelative ("name").stringValue, "Checkbox on the right enables the process group"), cManGC.FindPropertyRelative("expanded"+(post?"P":"T")), "BoldLabel") && cManEn.boolValue){//if group showing
+												if (TitleButton (new GUIContent (cManGC.FindPropertyRelative ("name").stringValue, "Checkbox on the right enables the process group"), cManGC.FindPropertyRelative ("expanded" + (post ? "P" : "T")), "BoldLabel") && cManEn.boolValue) {//if group showing
 											
-												EditorGUILayout.BeginVertical();
-												GUILayout.Space(0f);
-												EditorGUILayout.PropertyField (cManEn, GUIContent.none, GUILayout.Width (15f));
-												EditorGUILayout.EndVertical();
-												GUILayout.FlexibleSpace ();
+														EditorGUILayout.BeginVertical ();
+														GUILayout.Space (0f);
+														EditorGUILayout.PropertyField (cManEn, GUIContent.none, GUILayout.Width (15f));
+														EditorGUILayout.EndVertical ();
+														GUILayout.FlexibleSpace ();
 						
-												EnableDisable (cManG.FindPropertyRelative ("manufacture"), "enabled", true);
+														EnableDisable (cManG.FindPropertyRelative ("manufacture"), "enabled", true);
 														for (int p = 0; p<cManG.FindPropertyRelative ("manufacture").arraySize; p++) {//go through current manufacture processes
 																SerializedProperty cMan = cManG.FindPropertyRelative ("manufacture").GetArrayElementAtIndex (p);
 																SerializedProperty cManC = cManGC.FindPropertyRelative ("manufacture").GetArrayElementAtIndex (p);
@@ -434,13 +434,14 @@ namespace TradeSys
 																} else//end check if not able to, make sure is disabled
 																		cMan.FindPropertyRelative ("enabled").boolValue = false;
 														}//end for manufacturing processes														
-														}else{//end if showing group
-							EditorGUILayout.BeginVertical();
-						GUILayout.Space(0f);
-							EditorGUILayout.PropertyField (cManEn, GUIContent.none, GUILayout.Width (15f));
-						EditorGUILayout.EndVertical();
-						GUILayout.FlexibleSpace ();
-							EditorGUILayout.EndHorizontal ();}
+												} else {//end if showing group
+														EditorGUILayout.BeginVertical ();
+														GUILayout.Space (0f);
+														EditorGUILayout.PropertyField (cManEn, GUIContent.none, GUILayout.Width (15f));
+														EditorGUILayout.EndVertical ();
+														GUILayout.FlexibleSpace ();
+														EditorGUILayout.EndHorizontal ();
+												}
 						
 												EditorGUI.indentLevel = 0;
 												EditorGUILayout.LabelField ("", "", "PopupCurveSwatchBackground", GUILayout.MaxHeight (0f));

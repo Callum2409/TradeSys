@@ -59,7 +59,7 @@ namespace TradeSys
 		#endregion
 	
 		#region other
-				float[][] postDistances;//This is used so that Vector3.Distance is called as little as possible
+				float[][] postDistances;//This is used so that sqrMagnitude is called as little as possible
 				Distances[][] closest;//this is the closest x number of posts, which are used to work out trader targets
 	
 				int tradePostCount;//these are used so that the length of the array does not need to be used each time
@@ -69,7 +69,7 @@ namespace TradeSys
 		#endregion
 		#endregion	
 	
-//		System.Diagnostics.Stopwatch stoppy = new System.Diagnostics.Stopwatch ();
+				//			System.Diagnostics.Stopwatch stoppy = new System.Diagnostics.Stopwatch ();
 
 				void Start ()
 				{//at the start, the only thing that can be checked is to see if generate has been selected
@@ -80,10 +80,17 @@ namespace TradeSys
 						if (showLinesInGame)//if set debug bool to show lines in the game view
 								DrawLines ();
 				}//end Start
+				
+				float CalcDistance (GameObject tp1, GameObject tp2)
+				{//calculate the distance between the two specified trade posts
+						//this method is used as the distances between your trade posts may not be a direct striaght line
+						//for example, there may be obstacles in the way, so the actual distance will not be equal to the straight line distance
+						return (tp1.transform.position - tp2.transform.position).sqrMagnitude;//return the distance
+				}//end CalcDistance
 	
 				public void GenerateDistances ()
 				{//At the start, needs to generate all of the distances and the closest posts for use later. As this is called first, will call all other methods
-						//generate the distances so that dont need to call Vector3.Distance each time, instead it can just be referenced from the array
+						//generate the distances so that dont need to call sqrMagnitude each time, instead it can just be referenced from the array
 						traders = GameObject.FindGameObjectsWithTag (Tags.T);
 						traderCount = traders.Length;
 		
@@ -101,8 +108,11 @@ namespace TradeSys
 						}//end for initialisation distances and trade lists
 		
 						for (int t = 0; t<traderCount; t++) {//need to add all of the trader scripts, and get the starting postID
-								traderScripts [t] = traders [t].GetComponent<Trader> ();
-								traderScripts [t].postID = GetPostID (traderScripts [t].target);
+								Trader trader = traders [t].GetComponent<Trader> ();
+								traderScripts [t] = trader;
+								int postID = GetPostID (trader.target);
+								trader.postID = postID;
+								trader.startPost = trader.finalPost = postScripts [postID];
 						}//end go through traders
 		
 						#region get distances
@@ -110,55 +120,16 @@ namespace TradeSys
 						for (int t1 = 0; t1<tradePostCount; t1++) {//go through the posts
 								for (int t2 = t1; t2<tradePostCount; t2++) {//second for required so can get distances
 										if (t1 == t2)//if the same, needs to be infinity so traders will move
-												postDistances [t1] [t2] = Mathf.Infinity;
-										else {
-												if (!CheckFactionsGroups (postScripts [t1], postScripts [t2]))
-														postDistances [t1] [t2] = postDistances [t2] [t1] = Mathf.Infinity;
-												else
-														postDistances [t1] [t2] = postDistances [t2] [t1] = Vector3.Distance (tradePosts [t1].transform.position, tradePosts [t2].transform.position);
-										}
-										//can set these the same to save on the number of calculations required
+												postDistances [t1] [t2] = Mathf.Infinity;//need to set this to infinity so that itself is not an optional post
+										else
+												postDistances [t1] [t2] = postDistances [t2] [t1] = CalcDistance (tradePosts [t1], tradePosts [t2]);
+										//can set these the same to save on the number of calculations required, so is 0.5n(n+1)
 								}//end 2nd for		
 						}//end 1st for
 						#endregion
 	
-						#region get closest
-						if (closestPosts < tradePostCount) {//check if the closest posts is less than the total number
-								//now goes through the distances, taking the closest x posts to the target post
-								for (int p = 0; p<tradePostCount; p++) {//go through posts
-										closest [p] = new Distances[closestPosts];
-										for (int d = 0; d<closestPosts; d++) {//go through enough times to get x number of posts
-												closest [p] [d] = new Distances ();
-				
-												float min;
-												int index = FindMinimum (postDistances [p], tradePostCount, out min);
-					
-												if (min == Mathf.Infinity) {
-														for (int dc = d; dc<closestPosts; dc++) {//needs to go through the remaining closest, setting to infinity
-																closest [p] [dc] = new Distances ();
-																closest [p] [dc].post = -1;
-																closest [p] [dc].distance = Mathf.Infinity;
-														}
-														break;
-												}
-												postDistances [p] [index] = Mathf.Infinity;//set the postDistances one to infinity, so cannot be used again
-												closest [p] [d].post = index;
-												closest [p] [d].distance = min;
-										}//end for get closest x posts
-								}//end for all posts
-						} else {//end if closest to find is less than the total number of posts
-								closestPosts = tradePostCount;//set the closest posts to the actual number of posts
-								for (int p = 0; p<tradePostCount; p++) {
-										closest [p] = new Distances[tradePostCount];
-										for (int d = 0; d<tradePostCount; d++) {//go through the posts to get the distances to
-												closest [p] [d] = new Distances ();
-												closest [p] [d].distance = postDistances [p] [d];
-												closest [p] [d].post = postDistances [p] [d] != Mathf.Infinity ? d : -1;
-										}//end for to posts
-								}//end for all posts
-						}//end else
-						#endregion
-		
+						GetClosest ();//get the closest posts
+
 						//Now needs to call other methods
 						Average ();
 						for (int p = 0; p<postScripts.Length; p++)
@@ -176,8 +147,45 @@ namespace TradeSys
 								postScripts [t] = tradePosts [t].GetComponent<TradePost> ();
 				}//end GetPostScripts
 	
+				public void GetClosest ()
+				{//get the closest posts from the distance array
+						if (closestPosts > 0 && closestPosts < tradePostCount) {//check if the closest posts not set to 0 and is less than the total number
+								//now goes through the distances, taking the closest x posts to the target post
+								for (int p = 0; p<tradePostCount; p++) {//go through posts
+										closest [p] = new Distances[closestPosts];
+										for (int d = 0; d<closestPosts; d++) {//go through enough times to get x number of posts
+												closest [p] [d] = new Distances ();
+					
+												float min;
+												int index = FindMinimum (postDistances [p], tradePostCount, closest [p], p, out min);
+					
+												if (min == Mathf.Infinity) {
+														for (int dc = d; dc<closestPosts; dc++) {//needs to go through the remaining closest, setting to infinity
+																closest [p] [dc] = new Distances ();
+																closest [p] [dc].post = -1;
+																closest [p] [dc].distance = Mathf.Infinity;
+														}
+														break;
+												}
+												closest [p] [d].post = index;
+												closest [p] [d].distance = min;
+										}//end for get closest x posts
+								}//end for all posts
+						} else {//end if closest to find is less than the total number of posts
+								closestPosts = tradePostCount;//set the closest posts to the actual number of posts
+								for (int p = 0; p<tradePostCount; p++) {
+										closest [p] = new Distances[tradePostCount];
+										for (int d = 0; d<tradePostCount; d++) {//go through the posts to get the distances to
+												closest [p] [d] = new Distances ();
+												closest [p] [d].distance = postDistances [p] [d];
+												closest [p] [d].post = postDistances [p] [d] != Mathf.Infinity ? d : -1;
+										}//end for to posts
+								}//end for all posts
+						}//end else						
+				}//end GetClosest
+		
 		#region faction group check
-				bool CheckFactionsGroups (TradePost post1, TradePost post2)
+				public bool CheckFactionsGroups (TradePost post1, TradePost post2)
 				{//check that the posts have a same group and faction
 						if (CheckFactions (post1, post2) && CheckGroups (post1, post2))
 								return true;
@@ -220,14 +228,16 @@ namespace TradeSys
 				}//end CheckTraderFaction
 		#endregion
 	
-				int FindMinimum (float[] toCheck, int tradePostLength, out float distance)
+				int FindMinimum (float[] toCheck, int tradePostLength, Distances[] done, int postID, out float distance)
 				{//go through the given list, finding the minimum value, and the index
 						int index = 0;
-						float min = toCheck [0];
+						float min = Mathf.Infinity;
 						float currentCheck = 0;
 						for (int c = 0; c<toCheck.Length; c++) {
 								currentCheck = toCheck [c];
-								if (currentCheck < min) {
+								if (currentCheck < min && !done.Any (x => x != null && x.post == c) && 
+										CheckFactionsGroups (postScripts [postID], postScripts [c])) {
+										//check that the current is less, has not been added and share a group and faction
 										index = c;
 										min = currentCheck;
 								}//end if minimum
@@ -276,6 +286,7 @@ namespace TradeSys
 						}
 						for (int t = 0; t<traderCount; t++)
 								traderScripts [t].ManufactureCheck ();
+								
 						TradeCall ();//call the TradeCall method, to tell traders where to go
 				}//end UpdateMethods
 				
@@ -483,6 +494,7 @@ namespace TradeSys
 												post.UpdatePrices ();//update the prices at the trade post
 																					
 												trader.onCall = true;//set the trader to be doing something, so will not be given new trades
+												trader.startPost = trader.finalPost;//set the starting post to the post it is at
 												trader.finalPost = postScripts [trades [0].postID];//set the final post to the TradePost script to make it easier when trader gets there
 												trader.target = trader.finalPost.gameObject;//set the target to the trade post game object
 												trader.postID = trades [0].postID;//set the postID
@@ -491,7 +503,7 @@ namespace TradeSys
 												if (randomPost) {//if random posts selected, go to a random post in the closest
 														if (CheckTraderFaction (trader, postScripts [traderPostID])) {//check that the trader is in the same faction as the trade post in the first place
 																Distances[] reachable = System.Array.FindAll<Distances> (closest [traderPostID], x => (x.post != -1) && CheckTraderFaction (trader, postScripts [x.post]) && 
-								                                                         CheckFactionsGroups(postScripts[traderPostID], postScripts[x.post]) && postScripts [x.post].allowTrades);//get all of the reachable posts
+																		CheckFactionsGroups (postScripts [traderPostID], postScripts [x.post]) && postScripts [x.post].allowTrades);//get all of the reachable posts
 																//make the reachable array up of posts that are possible to get to, by making sure not -1 and in the same faction
 																if (reachable.Length == 0) {
 																		Debug.LogError (trader.name + " has no reachable posts! This may be due to incorrect factions or groups");
@@ -499,6 +511,7 @@ namespace TradeSys
 																}
 																int selectedPost = reachable [Random.Range (0, reachable.Length)].post;
 																trader.onCall = true;//set to true, so will not be told other posts
+																trader.startPost = trader.finalPost;//set the starting post to the post it is at
 																trader.finalPost = postScripts [selectedPost];//set the final post
 																trader.target = trader.finalPost.gameObject;//set the target gameobject
 																trader.postID = selectedPost;//set the postID
@@ -527,18 +540,20 @@ namespace TradeSys
 				{//for the current post, update the sell lists, for each of the closest posts, update the buy lists
 						#region price updates
 						//price updates are called here so that they are not pointlessly called in each update interval
-						if (!postScripts [postID].updated) {//check that has not updated the prices already
+						if (!postScripts [postID].updated)//check that has not updated the prices already
 								postScripts [postID].UpdatePrices ();//update the current post prices
-								postScripts [postID].updated = true;
-						}//end if not updated current post
 						for (int p = 0; p<closestPosts; p++) {
 								int cPID = closest [postID] [p].post;
 								if (cPID != -1 && !postScripts [cPID].updated && postScripts [cPID].allowTrades) {//check not -1 or price already updated and allowed to trade
 										postScripts [cPID].UpdatePrices ();
-										postScripts [cPID].updated = true;
+										tradeLists [cPID].buy.Clear ();//clear the buy lists for the trade post if not already updated
 								}//end if not -1 and not updated post
 						}//go through the closest posts and update the prices
 						#endregion
+						
+						tradeLists [postID].sell.Clear ();//clear current post sell list. cleared here because a trader may have already taken some of the items
+	
+						//clear the lists so that not duplicating any items, and will not need to check if item needs to be removed
 	
 						for (int g = 0; g<goods.Count; g++) {//go through all groups
 								for (int i = 0; i<goods[g].goods.Count; i++) {//go through all items	
@@ -550,59 +565,35 @@ namespace TradeSys
 												if (currentStock.number > Mathf.RoundToInt (itemAverage * sellMultiple))
 														tradeLists [postID].sell.Add (new BuySell{groupID = g, itemID = i});
 										}//end if enabled
-										tradeLists [postID].sell = tradeLists [postID].sell.Distinct ().ToList ();
 										#endregion
 				
 										#region add closest
 										//sort the buy list
 										for (int p = 0; p<closestPosts; p++) {//go through the closest posts
-												int currentPostID = closest [postID] [p].post;
-												if (currentPostID != -1) {//check that the post is not -1. If it is, then can't get there anyway
-														Stock currentPostStock = postScripts [currentPostID].stock [g].stock [i];
+												int cPID = closest [postID] [p].post;
+												if (cPID != -1 && !postScripts [cPID].updated && postScripts [cPID].allowTrades) {
+														//check that the post is not -1. If it is, then can't get there anyway
+														//also check that hasnt been updated already and that trades can occur
+														Stock currentPostStock = postScripts [cPID].stock [g].stock [i];
 														if (currentPostStock.buy) {//check if item is enabled
 																if (Mathf.RoundToInt (currentPostStock.number * buyMultiple) < itemAverage) //check that post wants to buy
-																		tradeLists [currentPostID].buy.Add (new BuySell{groupID = g, itemID = i});
+																		tradeLists [cPID].buy.Add (new BuySell{groupID = g, itemID = i});
 														}//end enabled check
-												}//end check not -1
+												}//end check buy list update
 										}//end for closest posts
 										#endregion
 								}//end for items
 						}//end for groups
 						
-						for (int p = 0; p<closestPosts; p++) {//go through the closest posts
-								int currentPostID = closest [postID] [p].post;
-								if (currentPostID != -1)
-										tradeLists [currentPostID].buy = tradeLists [currentPostID].buy.Distinct ().ToList ();
-						}//end for closest posts
-		
-						#region remove current
-						TradePost cP = postScripts [postID];
-						for (int s = 0; s<tradeLists[postID].sell.Count; s++) {//go through sell list
-								BuySell cSell = tradeLists [postID].sell [s];//the current sell item
-								Stock cStock = cP.stock [cSell.groupID].stock [cSell.itemID];//the current stock item at the trade post
-								if (!cStock.sell || !(cStock.number > Mathf.Round ((float)goods [cSell.groupID].goods [cSell.itemID].average * sellMultiple))) {//if no longer enabled or not enough to sell
-										tradeLists [postID].sell.RemoveAt (s);//remove item from the sell list
-										s--;//reduce s
-								}//end if need to remove
-						}//end for all sell
-						#endregion
-		
-						#region remove closest
-						for (int p = 0; p<closestPosts; p++) {//go through closest posts
+						#region updated
+						postScripts [postID].updated = true;
+						for (int p = 0; p<closestPosts; p++) {
 								int cPID = closest [postID] [p].post;
-								if (cPID != -1) {//check not -1
-										cP = postScripts [cPID];
-										for (int b = 0; b<tradeLists[cPID].buy.Count; b++) {//go through buy list
-												BuySell cBuy = tradeLists [cPID].buy [b];//current buy item
-												Stock cStock = cP.stock [cBuy.groupID].stock [cBuy.itemID];//current stock item at the trade post
-												if (!cStock.buy || !(Mathf.RoundToInt (cStock.number * buyMultiple) < goods [cBuy.groupID].goods [cBuy.itemID].average)) {//if not enabled, or has enough so does not need to buy, then remove
-														tradeLists [cPID].buy.RemoveAt (b);
-														b--;
-												}//end if need to remove
-										}//end for buy list
-								}//end check not -1
-						}//end for closest posts
+								if (cPID != -1)//check not -1 or price already updated and allowed to trade
+										postScripts [cPID].updated = true;
+						}//go through the closest posts and update the prices
 						#endregion
+						
 				}//end UpdateLists
 	
 				List<TradeInfo> BestTrade (int postID, int traderID)
@@ -614,8 +605,8 @@ namespace TradeSys
 
 						for (int p = 0; p<closestPosts; p++) {//go through closest posts
 								int currentPostID = closest [postID] [p].post;
-								if (currentPostID != -1 && CheckTraderFaction (traderScripts [traderID], postScripts [currentPostID]) && postScripts [currentPostID].allowTrades) {
-										//check not -1, so can actually get to the trade post, and check that they are in the same faction, and check that trading is allowed
+								if (currentPostID != -1 && CheckTraderFaction (traderScripts [traderID], postScripts [currentPostID]) && postScripts [currentPostID].allowTrades && CheckFactionsGroups (postScripts [postID], postScripts [currentPostID])) {
+										//check not -1, so can actually get to the trade post, and check that they are in the same faction, check that trading is allowed, and check that faction and group of posts is similar
 										intersect = sell.Intersect (tradeLists [currentPostID].buy).ToList ();
 										for (int i = 0; i<intersect.Count; i++) {//go through all items in intersect
 												BuySell cI = intersect [i];
@@ -725,5 +716,19 @@ namespace TradeSys
 						editing.cooldown = cooldownTime;//set the cooldown time
 						manufacture [manufactureGroup].manufacture [processNumber] = editing;//apply the changes
 				}//end EditProcess
+				
+				public void SortTraderDestination (TradePost target)
+				{//if the factions, groups or trade options are changed, need to sort out traders enroute
+						int pID = GetPostID (target.gameObject);//get the int id of the trade post
+				
+						for (int t = 0; t<traderCount; t++) {//go through all traders
+								if (traderScripts [t].postID == pID) {//if target post is one which has been edited
+										Trader trader = traderScripts [t];
+										trader.target = trader.startPost.gameObject;//go back to where the trader came from
+										trader.finalPost = trader.startPost;//go back to starting post
+										trader.postID = GetPostID (trader.finalPost.gameObject);
+								}//end for check trader destination post
+						}//end for traders
+				}//end SortTraderDestination
 		}//end Controller
 }//end namespace

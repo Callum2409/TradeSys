@@ -10,7 +10,7 @@ namespace TradeSys
 		{
 				Controller controller;
 				public GameObject target;//the current target of the trader
-				public TradePost finalPost;//the final post where the trader will end up
+				public TradePost startPost, finalPost;//the final post where the trader will end up
 				public int postID;//the ID of the current post
 				public bool onCall;//true if the trader has been given a destination post
 				public bool allowGo = false;//whether the trader is allowed to move or not
@@ -157,5 +157,28 @@ namespace TradeSys
 				controller.UpdateAverage (cNM.groupID, cNM.itemID, number, 0);//need to update the average number of this item
 			}//end for items
 		}//end AddRemove
+		
+		/// <summary>
+		/// Edit the manufacturing process, making it enabled or disabled or changing the create and cooldown times.
+		/// </summary>
+		/// <param name='manufactureGroup'>
+		/// The manufacture group the process belongs to
+		/// </param>
+		/// <param name='processNumber'>
+		/// The number of the process in the manufacture group
+		/// </param>
+		/// <param name='enabled'>
+		/// Set if the process is enabled or not
+		/// </param>
+		/// <param name='createTime'>
+		/// How long it takes for the process to create everything in the making list
+		/// </param>
+		/// <param name='cooldownTime'>
+		/// How long before the process is allowed to be run again
+		/// </param>		
+		public void EditProcess (int manufactureGroup, int processNumber, bool enabled, int createTime, int cooldownTime)
+		{
+			controller.EditProcess (manufacture, manufactureGroup, processNumber, enabled, createTime, cooldownTime);
+		}//end EditProcess
 	}//end Trader
 }//end namespace

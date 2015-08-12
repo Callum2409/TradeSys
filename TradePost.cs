@@ -156,22 +156,87 @@ namespace TradeSys
 				/// <summary>
 				/// Enable or disable trades or manufacturing completely
 				/// </summary>
-				/// <param name="enableTrades">If set to <c>true</c> enable trades.</param>
+				/// <param name="enableTrades">If set to <c>true</c> enable trades</param>
 				/// <param name="enableManufacture">If set to <c>true</c> enable manufacture.</param>
-				public void EnableDisable (bool enableTrades, bool enableManufacture)
+				public void EnableDisableTradeMan (bool enableTrades, bool enableManufacture)
 				{
 						//Needs to enable a trade post that has been disabled or disable an enabled trade post
 						if (enableTrades != allowTrades) {//check that not already the same
 								//need to go through all items updating averages
-								int change = enableTrades ? 1 : -1;
-								for (int g = 0; g<stock.Count; g++) {//go through all groups
+				int change = enableTrades ? 1 : -1;
+				for (int g = 0; g<stock.Count; g++) {//go through all groups
 										for (int i = 0; i<stock[g].stock.Count; i++) {//go through all items
 												controller.UpdateAverage (g, i, stock [g].stock [i].number * change, change);//update the average for the item
 										}//end for items
 								}//end for groups
 								allowTrades = enableTrades;//set to new value
-						}//end check changing trades
+				if(!enableTrades)
+				controller.SortTraderDestination(this);//need to sort destinations of traders enroute
+			}//end check changing trades
 						allowManufacture = enableManufacture;//set to the value
-				}//end EnableDisable
-		}//end TradePost
+				}//end EnableDisableTradeMan
+				
+				/// <summary>
+				/// Change the buy, sell and hidden options for a stock item
+				/// </summary>
+				/// <param name="groupID">Group ID</param>
+				/// <param name="itemID">Item ID</param>
+				/// <param name="buy">If set to <c>true</c> allow buy.</param>
+				/// <param name="sell">If set to <c>true</c> allow sell.</param>
+				/// <param name="hidden">If set to <c>true</c> allow hidden if buy and sell are both false.</param>
+				public void EnableDisableStock(int groupID, int itemID, bool buy, bool sell, bool hidden){
+			Stock cS = stock[groupID].stock[itemID];
+			
+			bool change = (cS.buy || cS.sell) != (buy || sell);//check if change in the buy / sell optins so that averages need changing
+
+			if(change){//if there is a change in the buy / sell bools
+				bool enable = (!cS.buy && buy) || (!cS.sell && sell);//work out whether the item is being enabled or disabled
+				int mult = enable ? 1 : -1;
+				controller.UpdateAverage(groupID, itemID, cS.number*mult, mult);//update the average
+				UpdateSinglePrice(groupID, itemID);//update the price
+			}//end if average needs changing
+			
+			cS.buy = buy;//set the buy option
+			cS.sell = sell;//set the sell option
+			cS.hidden = !buy && !sell && hidden;//only allow the hidden option to be true if buy and sell are false
+				}//end EnableDisableStock
+				
+				/// <summary>
+				/// Adds goods to the trade post
+				/// </summary>
+				/// <param name="groupID">Group ID of the item</param>
+				/// <param name="itemID">Item ID within the group</param>
+				/// <param name="number">Number to add</param>
+				public void AddRemoveGood(int groupID, int itemID, int number){
+			if(number >= 0 || stock[groupID].stock[itemID].number - number > 0){//check that there is enough of the item if removing items
+					stock[groupID].stock[itemID].number += number;//add the items to the trade post
+					controller.UpdateAverage(groupID, itemID, number, 0);//update the average stock numbers required for item pricing
+					UpdateSinglePrice(groupID, itemID);//update the item price
+					}else//else if not enough, display error
+					Debug.LogError("Not enough items in stock to remove!");
+				}//end AddGood
+				
+		/// <summary>
+		/// Changes the factions or groups
+		/// </summary>
+		/// <param name="factionsGroups">If set to <c>true</c> will change the factions. Set to <c>false</c> to change groups</param>
+		/// <param name="toChange">The enabled factions or groups</param>
+			public void ChangeFactionsGroups(bool factionsGroups, List<bool> toChange){
+				if((factionsGroups && controller.factions.enabled) || (!factionsGroups && controller.groups.enabled)){//only need to make changes if enabled
+					if(toChange.Count != (factionsGroups?factions.Count:groups.Count))//if not the same length, give an error
+						Debug.LogError((factionsGroups?"Factions":"Groups")+" list is not the same length as the number of "
+						+(factionsGroups?"factions":"groups")+" available!");
+				else{
+				
+					if(factionsGroups)
+					factions = toChange;
+					else
+					groups = toChange;
+					
+					controller.GetClosest();//update the closest posts array for trading
+					controller.SortTraderDestination(this);//sort out any traders enroute to this trade post
+				}//else make changes
+				}//end if factions enabled
+				}//end ChangeFactionsGroups
+	}//end TradePost
 }//end namespace
