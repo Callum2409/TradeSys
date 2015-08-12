@@ -1,221 +1,195 @@
-#if UNITY_4_0 || UNITY_4_1 || UNITY_4_2
+﻿#if UNITY_4_0 || UNITY_4_1 || UNITY_4_2
 #define API
 #endif
-
 using UnityEngine;
 using UnityEditor;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 
-namespace TradeSys{//uses TradeSys namespace to prevent any conflicts
-
-[CustomEditor(typeof(Trader))]
-public class TraderEditor : Editor
-{
-	
-	Controller controller;
-	Trader trader;
-	GameObject[] posts;
-	
-	void Awake ()
+namespace TradeSys
+{//use namespace to stop any name conflicts
+	[CanEditMultipleObjects, CustomEditor(typeof(Trader))]
+		public class TraderEditor : Editor
 	{
-		controller = GameObject.Find ("Controller").GetComponent<Controller> ();
-		trader = (Trader)target;
-		posts = GameObject.FindGameObjectsWithTag ("Trade Post");
-	}
 	
-	public override void OnInspectorGUI ()
-	{
-		#if !API
-		Undo.RecordObject(controller, "TradeSys Trader");
-		#endif
+		TSGUI GUITools = new TSGUI ();//extra gui methods which are used by all TradeSys scripts
 	
-		if (!controller.loadTraderPrefabs && !InHierarchy () && !controller.expendable) {
-			EditorGUILayout.HelpBox ("Nothing here can be set because:\n - The trader is not in the hierarchy\n - Expendable traders is disabled\n - Loading trader prefabs is off", MessageType.Info);
-		} else {
-			if (!InHierarchy ())
-				GUI.enabled = false;
-			EditorGUI.indentLevel = 0;
-			EditorGUILayout.BeginHorizontal ();
-			trader.target = (GameObject)EditorGUILayout.ObjectField (new GUIContent ("Target post", "This is the post that the trader starts at. This will change when playing to the post that the trader is going to."), trader.target, typeof(GameObject), true);
+		private SerializedObject controllerSO;
+		private Controller controllerNormal;
+		private SerializedObject traderSO;
+		private Trader traderNormal;
+		private SerializedProperty smallScroll;
+		private SerializedProperty scrollPosT;
+		private SerializedProperty controllerGoods;
+		private SerializedProperty targetPost;
+		private SerializedProperty cargoSpace;
+		private SerializedProperty cash;
+		private SerializedProperty closeDistance;
+		private SerializedProperty allow;
+		private SerializedProperty factions;
+		GameObject[] posts;
+	
+		void OnEnable ()
+		{
+			controllerNormal = GameObject.FindGameObjectWithTag (Tags.C).GetComponent<Controller> ();
+			controllerSO = new SerializedObject (controllerNormal);
 		
-			if (GUILayout.Button (new GUIContent ("Find post", "This will find the post that the trader is next to. Needs to be within 1 unit."), EditorStyles.miniButtonLeft)) {
-				#if API
-				Undo.RegisterUndo ((Trader)target, "Find post");
-				#endif
+			traderSO = new SerializedObject (targets);
+			traderNormal = (Trader)target;
+			traderNormal.tag = Tags.T;
+		
+			smallScroll = controllerSO.FindProperty ("smallScroll");
+		
+			scrollPosT = controllerSO.FindProperty ("scrollPosT");
+			controllerGoods = controllerSO.FindProperty ("goods");
+		
+			targetPost = traderSO.FindProperty ("target");
+			cargoSpace = traderSO.FindProperty ("cargoSpace");
+			cash = traderSO.FindProperty ("cash");
+			closeDistance = traderSO.FindProperty ("closeDistance");
+		
+			posts = GameObject.FindGameObjectsWithTag (Tags.TP);
+			allow = traderSO.FindProperty ("allowItems");
+		
+			factions = traderSO.FindProperty ("factions");
+	
+			GUITools.GetNames (controllerNormal);
+			controllerNormal.SortTrader (traderNormal);
+		}//end OnEnable
+	
+		public override void OnInspectorGUI ()
+		{
+						#if !API
+			Undo.RecordObject (controllerNormal, "TradeSys Trader");
+						#endif	
+			
+			if (PrefabUtility.GetPrefabType (traderNormal.gameObject) == PrefabType.Prefab)//if is prefab, show info to why no options can be set
+				EditorGUILayout.HelpBox ("Nothing here can be edited because this is a prefab.\nAllow expendable traders in the controller and add this as one in order to be able to set options", MessageType.Info);
+			else {//else show options because is not a prefab
+				traderSO.Update ();
+				controllerSO.Update ();
+		
+				EditorGUILayout.BeginHorizontal ();
+				if (targetPost.objectReferenceValue == null)//if no target has been selected
+					GUI.color = Color.red;//make it red so is obvious
+									
+				EditorGUILayout.PropertyField (targetPost, new GUIContent ("Target post", "This is the trade post that the trader is currently at"));
+				traderSO.ApplyModifiedProperties ();
 				
-				bool find = false;
-				for (int p = 0; p< posts.Length; p++) {
-					if (Vector3.Distance (posts [p].transform.position, trader.transform.position) <= trader.closeDistance) {
-						#if API
-						Undo.RegisterUndo ((Trader)target, "Find post");
-						#endif
-						
-						trader.target = posts [p];
-						trader.transform.position = trader.target.transform.position;
-						find = true;
-						break;
-					}
-				}
-				if (!find)
-					Debug.LogWarning ("Could not find a trade post close enough.\nMake sure that the co-ordinates of the trader " +
-					"have been set to a trade post, or select the trade post and press set location.");
-			}
-			if (trader.target == null)
-				GUI.enabled = false;
-			else
+				if (targetPost.objectReferenceValue != null && ((GameObject)targetPost.objectReferenceValue).tag != Tags.TP)//check that is not null and correct tag
+					targetPost.objectReferenceValue = null;//set to null if not a correct tag
+								
+				GUI.color = Color.white;//set the colour back to white
+		
+				//buttons need the max width calculation to make them as small as possible, as can't be done using flexible space
+				if (GUILayout.Button (new GUIContent ("Find post", "Attempts to find the trade post if one is within the close distance value"), EditorStyles.miniButtonLeft, GUILayout.MaxWidth (GUI.skin.button.CalcSize (new GUIContent ("Find post")).x))) {
+					bool find = false;//bool so that if not close enough, can display a message
+					for (int p = 0; p<posts.Length; p++) {//go through all posts
+						if (Vector3.Distance (traderNormal.transform.position, posts [p].transform.position) <= closeDistance.floatValue) {//check close enough
+							
+														#if API
+														Undo.RegisterUndo ((Trader)target, "TradeSys Trader");
+														#endif
+												
+							GameObject post = posts [p];
+							targetPost.objectReferenceValue = post;//set the target
+							traderSO.ApplyModifiedProperties ();//apply the modified properties so can then move the trader to the location
+							traderNormal.transform.position = post.transform.position;//move to the position of the trade post
+							find = true;//set to true because have found a trade post
+							break;//break bevause found a trade post
+						}//end if close enough
+					}//end for all posts
+					if (!find)//check to see if a post was found
+						EditorUtility.DisplayDialog ("No posts found", "No trade posts were found close enough. Try moving the trader closer, or increase the close distance value and try again.", "Ok");
+				}//end find post pressed
+				GUI.enabled = traderNormal.target != null;
+				if (GUILayout.Button (new GUIContent ("Set location", "Set the location of the trader to that of the selected target post"), EditorStyles.miniButtonRight, GUILayout.MaxWidth (GUI.skin.button.CalcSize (new GUIContent ("Set location")).x))) {
+					
+										#if API
+										Undo.RegisterUndo ((Trader)target, "TradeSys Trader");
+										#endif
+												
+					traderNormal.gameObject.transform.position = traderNormal.target.transform.position;
+				}//end if set location pressed
 				GUI.enabled = true;
-			if (GUILayout.Button (new GUIContent ("Set location", "This will set the location of the trader to be at the location of the selected target post"), EditorStyles.miniButtonRight)) {
-				#if API
-				Undo.RegisterUndo ((Trader)target, "Set location");
-				#endif
-				
-				trader.transform.position = trader.target.transform.position;
-			}
-			GUI.enabled = true;
-			EditorGUILayout.EndHorizontal ();
-			
-			if (InHierarchy ()) {//only show help box if in the hierarchy
-				if (trader.target == null)
-					EditorGUILayout.HelpBox ("Please select a trade post or press find post.", MessageType.Warning);
-				else if ((trader.target.tag != "Trade Post" || trader.target.GetComponent<TradePost> () == null) && !Application.isPlaying)
-					EditorGUILayout.HelpBox ("The target post selected is not a trade post or has been " +
-				"incorrectly set up.\nMake sure that the target post has the TradePost script attached and the " +
-				"tag set to Trade Post.", MessageType.Error);
-			} else {//end if not in hierarchy
-				//if in hierarchy, display message
-				EditorGUILayout.HelpBox ("The trader is not in the hierarchy, so no target post can be set because it is " +
-				"set by the controller when expendable traders have been enabled and the trader added.", MessageType.Info);
-			}
-			
-			EditorGUILayout.BeginHorizontal ();
-			trader.closeDistance = Mathf.Max (0, EditorGUILayout.FloatField (new GUIContent("Close distance", "If the trader is within this distance to the target, then it will trade or collect the item."), trader.closeDistance));
-			EditorGUILayout.LabelField ("");
-			EditorGUILayout.EndHorizontal ();
-			
-			EditorGUILayout.BeginHorizontal ();
-			string unit = "";
-			for (int u = 0; u<controller.units.Count; u++) {
-				if (trader.cargoSpace >= controller.units [u].min && trader.cargoSpace < controller.units [u].max)
-					unit = " (" + controller.units [u].suffix + ")";
-			}
-			trader.cargoSpace = EditorGUILayout.FloatField (new GUIContent ("Cargo space" + unit, "This is the amount of cargo space available."), trader.cargoSpace);
+				EditorGUILayout.EndHorizontal ();
 		
-			if (controller.pauseOption == 1)
-				trader.stopTime = EditorGUILayout.FloatField (new GUIContent ("Stop time", "This is the time that the trader will stop for before leaving a trade post"), trader.stopTime);
-			else
+				EditorGUILayout.BeginHorizontal ();
+				EditorGUILayout.PropertyField (closeDistance, new GUIContent ("Close distance", "If the trader is within this distance to a trade post or an item, it will register as being there"));
 				EditorGUILayout.LabelField ("");
-			EditorGUILayout.EndHorizontal ();
+				EditorGUILayout.EndHorizontal ();
+				if (closeDistance.floatValue < 0)
+					closeDistance.floatValue = 0;
 		
-			if (controller.allowPickup) {
-				bool before = trader.allowTraderPickup;
-				trader.allowTraderPickup = EditorGUILayout.Toggle (new GUIContent ("Allow trader collection", "Allow current trader to collect items from spawners or dropped items"), trader.allowTraderPickup);
-				if (before != trader.allowTraderPickup)
-					trader.transform.Translate (Vector3.zero);
-				if (trader.allowTraderPickup) {
-					EditorGUILayout.BeginHorizontal ();
-					trader.radarDistance = EditorGUILayout.FloatField (new GUIContent ("Radar distance", "This is how far the radar of " +
-			"the trader reaches. It is used to so that if the traders can collect items, and there is an item within the radar, " +
-			"the trader will go and pick it up."), trader.radarDistance);
-					trader.droneTime = EditorGUILayout.FloatField (new GUIContent ("Drone stop time", "This is the amount of time that the trader has to stop for if it is picking up an item"), trader.droneTime);
-					EditorGUILayout.EndHorizontal ();
-				}
-			}
+				EditorGUILayout.BeginHorizontal ();
+				EditorGUILayout.PropertyField (cargoSpace, new GUIContent ("Cargo space", "This is the amount of space available to the trader"));
+				EditorGUILayout.PropertyField (cash, new GUIContent ("Credits", "The amount of money that the trader has in order to purchase goods. Make sure that the trader has enough money to be able to make purchases!"));
+				EditorGUILayout.EndHorizontal ();
+				if (cargoSpace.floatValue < 0.000001f)
+					cargoSpace.floatValue = 0.000001f;
 		
-			trader.stopTime = Mathf.Max (trader.stopTime, 0);
-			trader.cargoSpace = Mathf.Max (trader.cargoSpace, 0.000001f);
-			trader.radarDistance = Mathf.Max (trader.radarDistance, 0);
-			trader.droneTime = Mathf.Max (trader.droneTime, 0);
+				if (cash.intValue < 0)
+					cash.intValue = 0;
 		
-		#region factions
-			if (controller.allowFactions) {
-				EditorGUI.indentLevel = 0;
-				EditorGUILayout.BeginVertical ("HelpBox");
-				controller.showTF = EditorGUILayout.Foldout (controller.showTF, "Factions");
-				if (controller.showTF) {
-					EditorGUILayout.BeginHorizontal ();
-					controller.showHoriz = EditorGUILayout.Toggle (new GUIContent ("Show items vertically", "This will show the items ascending vertically"), controller.showHoriz, "Radio");
-					controller.showHoriz = !EditorGUILayout.Toggle (new GUIContent ("Show items horizontally", "This will show the items ascending h"), !controller.showHoriz, "Radio");
-					EditorGUILayout.EndHorizontal ();
+				GUITools.HorizVertOptions (controllerSO.FindProperty ("showHoriz"));//show display options
+		
+				GUITools.StartScroll (scrollPosT, smallScroll);
 			
-					EditorGUI.indentLevel = 0;
-					if (controller.allowFactions && controller.factions.Count > 0) {
-						EditorGUILayout.BeginHorizontal ();
-						EditorGUILayout.LabelField ("Select factions", EditorStyles.boldLabel);
-						if (GUILayout.Button ("Select all", EditorStyles.miniButtonLeft)) {
-							#if API
-							Undo.RegisterUndo ((Trader)target, "Select all factions");
-							#endif
-							
-							for (int f = 0; f<trader.factions.Count; f++)
-								trader.factions [f] = true;
-						}
-						if (GUILayout.Button ("Select none", EditorStyles.miniButtonRight)) {
-							#if API
-							Undo.RegisterUndo ((Trader)target, "Select no factions");
-							#endif
-							
-							for (int f = 0; f<trader.factions.Count; f++)
-								trader.factions [f] = false;
-						}
-						EditorGUILayout.EndHorizontal ();
-						EditorGUI.indentLevel = 1;
-					
-						if (!controller.showHoriz) {
-							for (int a = 0; a<trader.factions.Count; a = a+2) {
-								EditorGUILayout.BeginHorizontal ();
-								trader.factions [a] = EditorGUILayout.Toggle (controller.factions [a].name, trader.factions [a]);
-								if (a < trader.factions.Count - 1)
-									trader.factions [a + 1] = EditorGUILayout.Toggle (controller.factions [a + 1].name, trader.factions [a + 1]);
-								EditorGUILayout.EndHorizontal ();
-							}
-						} else {
-							int half = Mathf.CeilToInt (trader.factions.Count / 2f);
+								#region allow items
+				EditorGUILayout.BeginVertical ("HelpBox");
+				EditorGUILayout.BeginHorizontal ();
+				EditorGUILayout.LabelField (new GUIContent ("Allow item trade", "Allow the trader to buy and sell certain items"), EditorStyles.boldLabel);
+				GUILayout.FlexibleSpace ();
+				GUITools.ExpandCollapse (controllerGoods, "expandedT", false);
+				EditorGUILayout.EndHorizontal ();
+		
+				for (int g = 0; g<controllerNormal.goods.Count; g++) {//for all groups
+					EditorGUI.indentLevel = 1;
+					SerializedProperty currentGroup = controllerGoods.GetArrayElementAtIndex (g);
+					SerializedProperty currentAllow = allow.GetArrayElementAtIndex (g).FindPropertyRelative ("allowItems");				
 				
-							for (int a = 0; a< half; a++) {
-								EditorGUILayout.BeginHorizontal ();
-								trader.factions [a] = EditorGUILayout.Toggle (controller.factions [a].name, trader.factions [a]);
-								if (half + a < trader.factions.Count)	
-									trader.factions [half + a] = EditorGUILayout.Toggle (controller.factions [half + a].name, trader.factions [half + a]);
-								EditorGUILayout.EndHorizontal ();
-							}
-						}
-					
-					} else//else not enabled, show help box
-						EditorGUILayout.HelpBox ("There are no available options because there are no possible factions", MessageType.Info);
-				}
+					EditorGUILayout.BeginHorizontal ();
+					currentGroup.FindPropertyRelative ("expandedT").boolValue = 
+					GUILayout.Toggle (currentGroup.FindPropertyRelative ("expandedT").boolValue, currentGroup.FindPropertyRelative ("name").stringValue, 
+					"Foldout");
+					GUITools.EnableDisable (currentAllow, "enabled", true);
+			
+					if (currentGroup.FindPropertyRelative ("expandedT").boolValue)
+						GUITools.HorizVertDisplay (controllerNormal.allNames [g], currentAllow, "enabled", controllerSO.FindProperty ("showHoriz").boolValue, 2);
+				}//end for all groups
 				EditorGUILayout.EndVertical ();
-			}
-		#endregion
-			if (!Application.isPlaying && trader.gameObject.activeInHierarchy && controller.allowFactions && !CheckFaction () && controller.factions.Count > 0 && trader.target != null && trader.target.tag == "Trade Post") {
-				EditorGUI.indentLevel = 0;
-				EditorGUILayout.HelpBox ("The target post and trader are not in the same faction.\nMake sure they are in the same faction so that the trader can make trades.", MessageType.Error);
-			}
-		}
-	}
-	
-	bool CheckFaction ()
-	{//checking that post is not of same faction
-		if (trader.target != null && trader.target.tag == "Trade Post") {
-			for (int f = 0; f<trader.factions.Count; f++) {
-				if (trader.factions [f] && trader.target.GetComponent<TradePost> ().factions [f])
-					return true;
-			}
-		}
-		return false;
-	}
-	
-	bool InHierarchy ()
-	{
-		if (trader.gameObject.activeSelf) {//if active, then can easily say if in hierarchy
-			return trader.gameObject.activeInHierarchy;
-		} else {//in not active, then needs to be enabled first to find out if in hierarchy
-			trader.gameObject.SetActive (true);
-			bool returning = trader.gameObject.activeInHierarchy;
-			trader.gameObject.SetActive (false);
-			return returning;
-		}
-	}
-}
+								#endregion
+		
+								#region factions
+				if (controllerNormal.factions.enabled) {//check that the factions have been enabled before showing anything
+					GUITools.Title (new GUIContent ("Select factions", "Select which factions the trader belongs to. In order to be able to make a trade, " +
+												"the trader and trade post have to have a faction in common"), true);
+					GUITools.EnableDisable (factions, "", false);
+				
+					string[] factionNames = new string[factions.arraySize];//need the name of the factions in an array
+					for (int f = 0; f<factions.arraySize; f++)
+						factionNames [f] = controllerNormal.factions.factions [f].name;
+				
+					if (factions.arraySize > 0)
+						GUITools.HorizVertDisplay (factionNames, factions, controllerSO.FindProperty ("showHoriz").boolValue, false);
+					else
+						EditorGUILayout.HelpBox ("No factions have been added, but factions have been enabled. Factions can be added in the controller", MessageType.Error);
+				
+					EditorGUI.indentLevel = 0;
+					if (targetPost.objectReferenceValue != null && !controllerNormal.CheckTraderFaction (traderNormal, traderNormal.target.GetComponent<TradePost> ()))//if not in the same faction, show error
+						EditorGUILayout.HelpBox ("The trader is not in the same faction as the trade post so will not be able to make any trades!" +
+														"\nMake sure that they have at least one faction in common.", MessageType.Error);
+				
+					EditorGUILayout.EndVertical ();
+				}//end if factions enabled
+								#endregion
+		
+				if (smallScroll.boolValue)//if small scroll enabled, then end the scroll view
+					EditorGUILayout.EndScrollView ();
+		
+				traderSO.ApplyModifiedProperties ();
+				controllerSO.ApplyModifiedProperties ();
+			}//end else not a prefab
+		}//end OnInspectorGUI
+	}//end TraderEditor
 }//end namespace
