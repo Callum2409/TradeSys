@@ -69,7 +69,8 @@ namespace TradeSys
 								for (int m1 = 0; m1<manufacture.Count; m1++) {//go through manufacture groups
 										for (int m2 = 0; m2<manufacture[m1].manufacture.Count; m2++) {//go through manufacture processes
 												RunMnfctr cMan = manufacture [m1].manufacture [m2];
-												if (cMan.enabled && !cMan.running) {//check that the process is allowed and not currently running
+												if (cMan.enabled && !cMan.running && cash - cMan.price > 0) {
+												//check that the process is allowed and not currently running and has enough cash
 														if (ResourceCheck (m1, m2)) {//check that has enough resources and check the stock numbers
 																//now needs to follow the process
 																StartCoroutine (Create (m1, m2));//follow the process
@@ -107,6 +108,9 @@ namespace TradeSys
 						Mnfctr process = controller.manufacture [groupID].manufacture [processID];//the manufacturing process in the controller
 						RunMnfctr postMan = manufacture [groupID].manufacture [processID];//the manufacturing process at the trade post
 		
+						cash -= postMan.price * (controller.expTraders.enabled ? 0 : 1);//remove the amount of money required to run the process
+						//only need to remove credits if expendable is disabled
+		
 						postMan.running = true;//set to true so cannot be called again until done
 						AddRemove (process.needing, true);//remove the items needed
 						yield return new WaitForSeconds (postMan.create);//pause for the creation time
@@ -143,10 +147,13 @@ namespace TradeSys
 				/// </param>
 				/// <param name='cooldownTime'>
 				/// How long before the process is allowed to be run again
-				/// </param>		
-				public void EditProcess (int manufactureGroup, int processNumber, bool enabled, int createTime, int cooldownTime)
+				/// </param>	
+				/// <param name='price'>
+				/// How much the process costs to run. Make negative to receive money
+				/// </param>	
+				public void EditProcess (int manufactureGroup, int processNumber, bool enabled, int createTime, int cooldownTime, int price)
 				{
-						controller.EditProcess (manufacture, manufactureGroup, processNumber, enabled, createTime, cooldownTime);
+						controller.EditProcess (manufacture, manufactureGroup, processNumber, enabled, createTime, cooldownTime, price);
 				}//end EditProcess
 		
 				/// <summary>

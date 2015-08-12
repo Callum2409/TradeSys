@@ -63,10 +63,9 @@ namespace TradeSys
 				private SerializedProperty pauseOption, pauseTime, pauseEnter, pauseExit;
 				private SerializedProperty goods;
 				private SerializedProperty manufacture;
-				private SerializedProperty closestPosts, buyMultiple, sellMultiple, distanceWeight, profitWeight, purchasePercent, priceUpdates, expTraders;
+				private SerializedProperty closestPosts, buyMultiple, sellMultiple, distanceWeight, profitWeight, purchasePercent, priceUpdates, moveType, expTraders;
 				private SerializedProperty postTags, groups, factions;
 				private SerializedProperty units;
-				
 				bool expendable;
 			#endregion
 
@@ -87,14 +86,14 @@ namespace TradeSys
 						
 						expendable = controllerNormal.expTraders.enabled;
 						
-						if(!expendable){//get traders if not expendable
-						controllerNormal.traders = GameObject.FindGameObjectsWithTag (Tags.T);
-						controllerNormal.traderScripts = new Trader[controllerNormal.traders.Length];
-						traderScripts = new SerializedObject[controllerNormal.traders.Length];
-						for (int t = 0; t<controllerNormal.traders.Length; t++) {
-								controllerNormal.traderScripts [t] = controllerNormal.traders [t].GetComponent<Trader> ();
-								traderScripts [t] = new SerializedObject (controllerNormal.traderScripts [t]);
-						}
+						if (!expendable) {//get traders if not expendable
+								controllerNormal.traders = GameObject.FindGameObjectsWithTag (Tags.T);
+								controllerNormal.traderScripts = new Trader[controllerNormal.traders.Length];
+								traderScripts = new SerializedObject[controllerNormal.traders.Length];
+								for (int t = 0; t<controllerNormal.traders.Length; t++) {
+										controllerNormal.traderScripts [t] = controllerNormal.traders [t].GetComponent<Trader> ();
+										traderScripts [t] = new SerializedObject (controllerNormal.traderScripts [t]);
+								}
 						}//end if not expendable
 						
 						GameObject[] spawners = GameObject.FindGameObjectsWithTag (Tags.S);
@@ -136,11 +135,12 @@ namespace TradeSys
 						profitWeight = controllerSO.FindProperty ("profitWeight");
 						purchasePercent = controllerSO.FindProperty ("purchasePercent");
 						priceUpdates = controllerSO.FindProperty ("priceUpdates");
+						moveType = controllerSO.FindProperty ("moveType");
 		
 						postTags = controllerSO.FindProperty ("postTags");
 						groups = controllerSO.FindProperty ("groups");
-			factions = controllerSO.FindProperty ("factions");
-			expTraders = controllerSO.FindProperty ("expTraders");
+						factions = controllerSO.FindProperty ("factions");
+						expTraders = controllerSO.FindProperty ("expTraders");
 		
 						units = controllerSO.FindProperty ("units");
 						#endregion
@@ -159,9 +159,9 @@ namespace TradeSys
 						for (int p = 0; p<postScripts.Length; p++) 
 								postScripts [p].Update ();
 				
-				if(!expendable)
-						for (int t = 0; t<traderScripts.Length; t++)
-								traderScripts [t].Update ();
+						if (!expendable)
+								for (int t = 0; t<traderScripts.Length; t++)
+										traderScripts [t].Update ();
 								
 						for (int s = 0; s<spawnerScripts.Length; s++)
 								spawnerScripts [s].Update ();
@@ -272,30 +272,42 @@ namespace TradeSys
 					
 										EditorGUILayout.BeginHorizontal ();
 										EditorGUILayout.PropertyField (distanceWeight, new GUIContent ("Distance weight", "The value that the distance is multiplied by in order to help find the best post to go to. This could for example be the fuel cost per unit"));
-					if(!expendable)//only show profit if not expendable
-										EditorGUILayout.PropertyField (profitWeight, new GUIContent ("Profit weight", "The value that the profit is multiplied by in order to help find the best post to go to. This is by taking the profit, multiplying by this value and subtracting the distance multiplied by the distance weight"));
+										if (!expendable)//only show profit if not expendable
+												EditorGUILayout.PropertyField (profitWeight, new GUIContent ("Profit weight", "The value that the profit is multiplied by in order to help find the best post to go to. This is by taking the profit, multiplying by this value and subtracting the distance multiplied by the distance weight"));
 										else
-										EditorGUILayout.LabelField("");
+												EditorGUILayout.LabelField ("");
 										EditorGUILayout.EndHorizontal ();
 			
-					if(!expendable){//only show purchase percent and price updates if not expendable
-										EditorGUILayout.BeginHorizontal ();
-										//the purchase percent is as the value before multiplied by 100. This is so that when used, does not need to be constantly divided by 100
-										//it is only in the editor
-										purchasePercent.floatValue = 0.01f * EditorGUILayout.FloatField (new GUIContent ("Purchase percent", "This is the percentage of the sale price that the trade post buys items at"), purchasePercent.floatValue * 100);
-										UnitLabel ("%", 32);
-										EditorGUILayout.LabelField ("");
-										EditorGUILayout.EndHorizontal ();
+										if (!expendable) {//only show purchase percent and price updates if not expendable
+												EditorGUILayout.BeginHorizontal ();
+												//the purchase percent is as the value before multiplied by 100. This is so that when used, does not need to be constantly divided by 100
+												//it is only in the editor
+												purchasePercent.floatValue = 0.01f * EditorGUILayout.FloatField (new GUIContent ("Purchase percent", "This is the percentage of the sale price that the trade post buys items at"), purchasePercent.floatValue * 100);
+												UnitLabel ("%", 32);
+										
+												EditorGUILayout.LabelField ("");
+												EditorGUILayout.EndHorizontal ();
 
-										if (purchasePercent.floatValue < 0)
-												purchasePercent.floatValue = 0;
-										else if (purchasePercent.floatValue > 1)
-												purchasePercent.floatValue = 1;
-										//constrain between 0 and 1. Any less, gets paid for receiving, any more not making profit
+												if (purchasePercent.floatValue < 0)
+														purchasePercent.floatValue = 0;
+												else if (purchasePercent.floatValue > 1)
+														purchasePercent.floatValue = 1;
+												//constrain between 0 and 1. Any less, gets paid for receiving, any more not making profit
 										
 												EditorGUILayout.PropertyField (priceUpdates, new GUIContent ("Update prices", "Update the prices of the item after each individual item has been purchased"));
 									
-									}//end if not expendable
+												GUIContent[] moveOptions = new GUIContent[] {
+														new GUIContent ("Random post", "Move to a random post that the trader is able to reach. Not closest because could just be moving between the same trade posts."),
+														new GUIContent ("Items per distance", "Move to a reachable trade post which has the highest value when the number of items the post wants to sell is divided by the distance. " +
+																"The highest value will give the trader the best chance of fining a trade with per unit distance."),
+														new GUIContent ("Best trade", "Move to the reachable trade post which offers the best trade out of all the reachable trade posts. This requires a lot more computing power and may not result in a valid move.")
+												};
+						
+												moveType.intValue = EditorGUILayout.Popup (new GUIContent ("Move option", "Select what happens when a trader is unable to make a trade at the trade post its at. Processing power required increases down the list."), 
+								moveType.intValue, moveOptions, "DropDownButton");
+						
+									
+										}//end if not expendable
 									
 										//make sure that the values never go below minimum
 										if (closestPosts.intValue < 0)
@@ -402,12 +414,12 @@ namespace TradeSys
 					#endregion
 					
 					#region expendable
-					bool before = controllerNormal.expTraders.enabled;
+								bool before = controllerNormal.expTraders.enabled;
 								TGFE (2, new GUIContent ("Expendable traders", "Create traders to carry cargo from one trade post to another. The trader will be deleted when it arrives at its desitination"),
 					expTraders, "expendable", "Expendable ");
-				expendable =controllerNormal.expTraders.enabled;
-				if(!before && expendable)
-				controllerNormal.SortTraders();//need to sort the traders if just enabled them again
+								expendable = controllerNormal.expTraders.enabled;
+								if (!before && expendable)
+										controllerNormal.SortTraders ();//need to sort the traders if just enabled them again
 					#endregion
 			
 					#region units
@@ -842,7 +854,7 @@ namespace TradeSys
 								EditorGUILayout.LabelField ("Number of processes", currentManGroup.arraySize.ToString ());
 								GUILayout.FlexibleSpace ();
 			
-								GUI.enabled = manufacture.arraySize > 0 && CheckMan();
+								GUI.enabled = manufacture.arraySize > 0 && CheckMan ();
 								if (GUILayout.Button (new GUIContent ("Check", "Check all manufacturing at trade posts to give an estimate on changes of numbers of each item"), EditorStyles.miniButtonLeft, GUILayout.MinWidth (45f))) {//CheckManufacturing (manufactureCount, groupLengthsM, groupLengthsG, manufacture);
 										CheckManufacturingWindow window = (CheckManufacturingWindow)EditorWindow.GetWindow (typeof(CheckManufacturingWindow), true, "Manufacturing check");
 										window.position = new Rect (Screen.currentResolution.width / 2 - 275, Screen.currentResolution.height / 2 - 200, 550, 400);
@@ -979,9 +991,9 @@ namespace TradeSys
 		
 						for (int p = 0; p<postScripts.Length; p++) 
 								postScripts [p].ApplyModifiedProperties ();
-						if(!expendable)
-						for (int t = 0; t<traderScripts.Length; t++)
-								traderScripts [t].ApplyModifiedProperties ();
+						if (!expendable)
+								for (int t = 0; t<traderScripts.Length; t++)
+										traderScripts [t].ApplyModifiedProperties ();
 						for (int s = 0; s<spawnerScripts.Length; s++)
 								spawnerScripts [s].ApplyModifiedProperties ();
 				}//end OnInspectorGUI
@@ -1499,8 +1511,8 @@ namespace TradeSys
 					
 										if (option == 2) {//if is expendable, need to show couple of other options
 												EditorGUILayout.BeginHorizontal ();
-						SerializedProperty maxNoTraders = options.FindPropertyRelative("maxNoTraders");
-						EditorGUILayout.PropertyField (maxNoTraders, new GUIContent ("Max traders", "The maximum number of expendable traders allowed. Set this to 0 for infinite."));
+												SerializedProperty maxNoTraders = options.FindPropertyRelative ("maxNoTraders");
+												EditorGUILayout.PropertyField (maxNoTraders, new GUIContent ("Max traders", "The maximum number of expendable traders allowed. Set this to 0 for infinite."));
 						
 												if (maxNoTraders.intValue < 0)
 														maxNoTraders.intValue = 0;
@@ -1623,9 +1635,10 @@ namespace TradeSys
 								itemScript = crate.AddComponent<Item> ();
 				}//end SortCrate
 				
-				bool CheckMan(){//check that all of the manufacturing processes point to an item, returns false if not
-				//	for(int g = 0; g<con)
-				return true;
+				bool CheckMan ()
+				{//check that all of the manufacturing processes point to an item, returns false if not
+						//	for(int g = 0; g<con)
+						return true;
 				}//end CheckMan
 		}//end ControllerEditor
 }//end namespace

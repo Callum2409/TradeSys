@@ -13,9 +13,8 @@ namespace TradeSys
 				TSGUI GUITools = new TSGUI ();
 				int selection;
 				public float[][] perItem;//the per item changes
-				public float total;//the total changes
+				public float total, cashChange;//the total changes
 				string[][] info;//the item changes strings
-				string totalInfo;
 				string[][] pricing;
 	
 				void Awake ()
@@ -31,7 +30,7 @@ namespace TradeSys
 						EditorGUILayout.BeginHorizontal ();
 						GUILayout.FlexibleSpace ();
 						string[] options = new string[]{"Item numbers", "Item pricing"};
-			selection = GUILayout.Toolbar (selection, controller.expTraders.enabled ? new string[]{options [0]} : options);
+						selection = GUILayout.Toolbar (selection, controller.expTraders.enabled ? new string[]{options [0]} : options);
 						GUILayout.FlexibleSpace ();
 						EditorGUILayout.EndHorizontal ();
 		
@@ -42,7 +41,8 @@ namespace TradeSys
 								EditorGUILayout.LabelField ("NOTE: This can only be used as a guide because there may be pauses and greater times between " +
 										"manufacturing processes if items are not available.\n\nAs a result, there will be some variances, but will still " +
 										"be useful to give an idea of whether the numbers of an item is expected to increase, decrease or stay the same.\n\n" +
-										"A larger number means that this change is faster.", EditorStyles.wordWrappedLabel);//the text which is always displayed
+										"The number is the change in quantity of the item per second so a larger number means that this change is faster.",
+										EditorStyles.wordWrappedLabel);//the text which is always displayed
 		
 								EditorGUILayout.LabelField ("", "", "ShurikenLine", GUILayout.MaxHeight (1f));//draw a separating line
 								scrollPosN = EditorGUILayout.BeginScrollView (scrollPosN);
@@ -57,7 +57,12 @@ namespace TradeSys
 					
 								EditorGUI.indentLevel = 0;
 								EditorGUILayout.Space ();//space between all the items and the total change
-								EditorGUILayout.LabelField ("Total change", totalInfo);
+
+								EditorGUILayout.LabelField ("Item change", SetChange (total));
+
+								if (!controller.expTraders.enabled)
+										EditorGUILayout.LabelField ("Credit change", SetChange (cashChange));
+				
 								EditorGUILayout.EndVertical ();
 								GUILayout.EndScrollView ();
 								break;
@@ -66,7 +71,10 @@ namespace TradeSys
 				#region pricing
 						case 1:
 								EditorGUI.indentLevel = 0;
-								EditorGUILayout.LabelField ("This is showing the profit per time the manufacturing process occurs. This is a best-case scenario, where the cost of items purchased to manufacture are at their lowest, and the items made are sold at the highest. As a result, the profits are likely to be lower than this.\n\nAny process that shows a negative value here will always have a loss.\n\nThis assumes that the item prices are set automatically", EditorStyles.wordWrappedLabel);
+								EditorGUILayout.LabelField ("This is showing the profit per time the manufacturing process occurs. This is a best-case scenario, " +
+										"where the cost of items purchased to manufacture are at their lowest, and the items made are sold at the highest. As a result, the " +
+										"profits are likely to be lower than this.\n\nAny process that shows a negative value here will always have a loss.\n\n" +
+										"This assumes that the item prices are set automatically.", EditorStyles.wordWrappedLabel);
 		
 								EditorGUILayout.LabelField ("", "", "ShurikenLine", GUILayout.MaxHeight (1f));//draw a separating line
 								scrollPosP = EditorGUILayout.BeginScrollView (scrollPosP);
@@ -78,7 +86,6 @@ namespace TradeSys
 										GUITools.HorizVertDisplay (controller.manufactureNames [m], pricing [m], controller.manufactureTooltips [m], showHoriz, 1);
 								}
 								EditorGUILayout.EndVertical ();
-			
 								EditorGUILayout.EndScrollView ();
 								break;
 				#endregion
@@ -94,7 +101,7 @@ namespace TradeSys
 								perItem [g] = new float[controller.goods [g].goods.Count];
 								info [g] = new string[controller.allNames [g].Length];
 						}
-						total = 0;//reset the total
+						total = cashChange = 0;//reset the totals
 						pricing = new string[controller.manufacture.Count][];
 			
 						List<MnfctrTypes> manufacture = controller.manufacture;
@@ -116,13 +123,12 @@ namespace TradeSys
 					
 										#region pricing
 										int profit = 0;
-										Mnfctr current = controller.manufacture [m1].manufacture [m2];
-										for (int nm = 0; nm < current.needing.Count; nm++) {//go through all needing, getting min cost
-												NeedMake currentNM = current.needing [nm];
+										for (int nm = 0; nm < cMan.needing.Count; nm++) {//go through all needing, getting min cost
+												NeedMake currentNM = cMan.needing [nm];
 												profit -= controller.goods [currentNM.groupID].goods [currentNM.itemID].minPrice * currentNM.number;
 										}//end for needing
-										for (int nm = 0; nm < current.making.Count; nm++) {//go through all making, getting max price
-												NeedMake currentNM = current.making [nm];
+										for (int nm = 0; nm < cMan.making.Count; nm++) {//go through all making, getting max price
+												NeedMake currentNM = cMan.making [nm];
 												profit += controller.goods [currentNM.groupID].goods [currentNM.itemID].maxPrice * currentNM.number;
 										}//end for needing
 										pricing [m1] [m2] = profit.ToString ();
@@ -133,8 +139,6 @@ namespace TradeSys
 						for (int x = 0; x<info.Length; x++)//go through all goods, saying increase, decrease or stay the same and give a value
 								for (int y = 0; y<info[x].Length; y++)
 										info [x] [y] = SetChange (perItem [x] [y]);
-			
-						totalInfo = SetChange (total);//add a change string to the total change
 				}//end CalcInfo
 		
 				void NumberChange (RunMnfctr man, Mnfctr cMan)
@@ -142,6 +146,9 @@ namespace TradeSys
 						if (man.enabled) {//check that item is enabled
 								float toChange = 0;
 								float deniminator = man.create + man.cooldown;//get the denominator. This is the minimum time between subsequent manufactures
+								
+								cashChange -= man.price / deniminator;//work out how the amount of cash will change
+								
 								for (int nm = 0; nm<cMan.needing.Count; nm++) {//go through needing, reducing perItem
 										toChange = cMan.needing [nm].number / deniminator;
 										total -= toChange;
@@ -159,10 +166,10 @@ namespace TradeSys
 				string SetChange (float change)
 				{//check to see if increase, decrease or the same
 						if (change > 0)
-								return "increase (" + change.ToString ("f2") + ")";
+								return "Increase (" + change.ToString ("f2") + ")";
 						if (change < 0)
-								return "decrease (" + Mathf.Abs (change).ToString ("f2") + ")";
-						return "same";
+								return "Decrease (" + Mathf.Abs (change).ToString ("f2") + ")";
+						return "Same";
 				}//end SetChange
 		
 		}//end CheckManufacturingWindow

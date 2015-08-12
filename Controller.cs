@@ -39,8 +39,10 @@ namespace TradeSys
 				public float sellMultiple = 1.5f;//used to decide which items should be sold
 				public float purchasePercent = 0.7f;//used for the prices of items when the trade post is buying
 				public bool priceUpdates;//if true, will update the price after purchasing each item, so prices may increase / decrease while traders purchase
-				public bool randomPost = true;//if there are no trades from the current post, go to a random post, or find the best
 				public ExpendableList expTraders;//the different types of expendable trader that can be selected
+				public int moveType = 0;//the different move options the traders have
+				//0 = random
+				//1 = max(number to sell / distance)
 	
 				public int pauseOption = 0;	//the selected pause option
 				public float pauseTime;//the time to pause for
@@ -75,7 +77,7 @@ namespace TradeSys
 		#endregion
 		#endregion	
 	
-				//	System.Diagnostics.Stopwatch stoppy = new System.Diagnostics.Stopwatch ();
+				//System.Diagnostics.Stopwatch stoppy = new System.Diagnostics.Stopwatch ();
 
 				void Start ()
 				{				
@@ -97,8 +99,8 @@ namespace TradeSys
 								}//end for goods groups
 						}//end if need to sort crates
 						
-						if(expTraders.enabled)//if expendable, set the profit weight to be 0
-						profitWeight = 0;
+						if (expTraders.enabled)//if expendable, set the profit weight to be 0
+								profitWeight = 0;
 				}//end Start
 				
 				float CalcDistance (GameObject tp1, GameObject tp2)
@@ -141,17 +143,17 @@ namespace TradeSys
 								trader.startPost = trader.finalPost = postScripts [postID];
 						}//end go through traders
 						
-						if(!expTraders.enabled){//if expendable, check not null
-			for (int t = 0; t<expTraders.traders.Count; t++) {//go through all expendable and check arent null
-				if (expTraders.traders [t] == null) {//check if null
-					Debug.LogError ("One or more expendable traders have been set to null");
-					break;
-				}//end if null						
-			}//end for all expendable
-			}//end if expendable
+						if (!expTraders.enabled) {//if expendable, check not null
+								for (int t = 0; t<expTraders.traders.Count; t++) {//go through all expendable and check arent null
+										if (expTraders.traders [t] == null) {//check if null
+												Debug.LogError ("One or more expendable traders have been set to null");
+												break;
+										}//end if null						
+								}//end for all expendable
+						}//end if expendable
 			
-			#region get distances
-			//now needs to go through and get all of the distances between all of the posts, where they are in the same group and faction
+						#region get distances
+						//now needs to go through and get all of the distances between all of the posts, where they are in the same group and faction
 						for (int p = 0; p<tradePostCount; p++)//go through the posts
 								SingleDist (p, p);
 						#endregion
@@ -608,43 +610,90 @@ namespace TradeSys
 								}//end for all cargo trades
 								post.UpdatePrices ();//update the prices at the trade post
 				
-								trader.onCall = true;//set the trader to be doing something, so will not be given new trades
-								trader.startPost = trader.finalPost;//set the starting post to the post it is at
-								trader.finalPost = postScripts [trades [0].postID];//set the final post to the TradePost script to make it easier when trader gets there
-								trader.target = trader.finalPost.gameObject;//set the target to the trade post game object
-								trader.postID = trades [0].postID;//set the postID
-								StartCoroutine (trader.PauseExit (totalTime));//now pause
+								SendToPost (trader, trades [0].postID, false, totalTime);//send the trader to the trade post
 						} else {//if no trades, then needs to move or be deleted
 								if (expTraders.enabled) {//if expendable and have got here, delete the trader
 										trader.DestroyTrader ();
 										return false;//return so dont need to do anything else
 								}//end if expendable
 								if (trader.tradeType > 0) {//if is depot and nothing to take
-										SendToPost (trader, trader.homeID);//send the trader back to the depot
+										SendToPost (trader, trader.homeID, true, 0);//send the trader back to the depot
 										return false;//return so doesnt do the random post bit
 								}//end if depot
-				
-								if (randomPost) {//if random posts selected, go to a random post in the closest
-										if (CheckTraderFaction (trader, postScripts [traderPostID])) {//check that the trader is in the same faction as the trade post in the first place
-												Distances[] reachable = System.Array.FindAll<Distances> (closest [traderPostID], x => (x.post != -1) && CheckTraderFaction (trader, postScripts [x.post]) && 
-														CheckFactionsGroups (postScripts [traderPostID], postScripts [x.post]) && postScripts [x.post].allowTrades);//get all of the reachable posts
-												//make the reachable array up of posts that are possible to get to, by making sure not -1 and in the same faction
-												if (reachable.Length == 0) {
-														Debug.LogError (trader.name + " has no reachable posts! This may be due to incorrect factions or groups");
-														return false;
-												}
-												SendToPost (trader, reachable [Random.Range (0, reachable.Length)].post);//send the trader to the post
-						
-										} else//end check in the same faction as the trader
-												Debug.LogError (trader.name + " is not in the same faction as the starting trade post, so is not able to make any trades ");
-								} else {//else needs to work out which post to go to
-										//needs to go through all of the closest reachable posts, and find which has the best trade
-										//done by following the best trade and update methods from this, and adding the best trades into another array
-										//compare this best of the best array, and then select the destination post
-								}//end else find post
+								
+								switch (moveType) {//have a switch for the different options
+								case 0://random post
+										MoveToRandom (trader, traderPostID);//call the random method										
+										break;
+								
+								case 1://max(number to sell / distance)
+										NeedMake[] bestMove = new NeedMake[closestPosts];//use a NeedMake[] as groupID = postID and number = number
+								
+										for (int p = 0; p<closestPosts; p++) {//for all trade posts
+												bestMove [p] = new NeedMake ();
+												bestMove [p].groupID = closest [traderPostID] [p].post;//set the groupID to be the postID
+												bestMove [p].itemID = p;//set the itemID to be the array element ID
+												//the element ID is used so that the closest posts array can be used as it will be faster
+												if (bestMove [p].groupID != -1 && CheckTraderFaction (trader, postScripts [bestMove [p].groupID])) {//if is not -1 and reachable
+														for (int g = 0; g<goods.Count; g++) {//for all goods
+																for (int i = 0; i<goods[g].goods.Count; i++) {//for all items
+																		float itemAverage = (float)goods [g].goods [i].average;
+																		//sort the sell list
+																		Stock currentStock = postScripts [bestMove [p].groupID].stock [g].stock [i];
+																		if (currentStock.sell) {//check to see if the item is enabled
+																				if (currentStock.number > Mathf.RoundToInt (itemAverage * sellMultiple))
+																						bestMove [p].number++;//increase the number in the list
+																		}//end if enabled
+																}//end for items
+														}//end for goods
+												}//end if not -1
+										}//end for all trade posts 
+									//will now have all of the number of items that the closest posts want to sell
+									//the aggregate bit will go through and get the object where the number/distance is greatest and send the trader there
+										SendToPost (trader, bestMove.Aggregate ((a,b) => a.number / closest [traderPostID] [a.itemID].distance > b.number / closest [traderPostID] [b.itemID].distance ? a : b).groupID, true, 0);
+										break;
+								case 2:
+										List<TradeInfo> bestTrades = new List<TradeInfo> ();//the list of the very best trade from each trade post
+									
+										for (int c = 0; c<closestPosts; c++) {//for all closest
+												int cPID = closest [traderPostID] [c].post;
+												if (cPID == -1)//check not -1
+														break;//break if -1
+										
+												List<TradeInfo> thisList = BestTrade (cPID, trader);
+												if (thisList != null) {//if not null
+														bestTrades.Add (thisList [0]);//add the very best trade to the best trades list
+														bestTrades [bestTrades.Count - 1].postID = cPID;//change the postID of the last added so is the trade post that needs to move to and not the final destination post
+												}//end if not null
+										}//end for all closest
+									//now has all of the very best trades
+										if (bestTrades.Count == 0)//if no best trades, move to a random post and try again there
+												return MoveToRandom (trader, traderPostID);
+									
+										bestTrades.Sort ();
+										SendToPost (trader, bestTrades [0].postID, true, 0);//send the trader to the very best trade post
+										break;
+								}//end move type switch
 						}//end else move
 						return true;
 				}//end TraderSet
+				
+				bool MoveToRandom (Trader trader, int traderPostID)
+				{//move to a random post. is here as is called by best trades if none can be found
+						if (CheckTraderFaction (trader, postScripts [traderPostID])) {//check that the trader is in the same faction as the trade post in the first place
+								Distances[] reachable = System.Array.FindAll<Distances> (closest [traderPostID], x => (x.post != -1) && CheckTraderFaction (trader, postScripts [x.post]) && 
+										postScripts [x.post].allowTrades);//get all of the reachable posts
+								//make the reachable array up of posts that are possible to get to, by making sure not -1 and in the same faction
+								if (reachable.Length == 0) {
+										Debug.LogError (trader.name + " has no reachable posts! This may be due to incorrect factions or groups");
+										return false;
+								}
+								SendToPost (trader, reachable [Random.Range (0, reachable.Length)].post, true, 0);//send the trader to the post
+				
+						} else//end check in the same faction as the trader
+								Debug.LogError (trader.name + " is not in the same faction as the starting trade post, so is not able to make any trades ");
+						return true;
+				}//end MoveToRandom
 	
 				public int GetPostID (GameObject post)
 				{//find out which index in the arrays the target post is
@@ -732,8 +781,8 @@ namespace TradeSys
 								
 								if ((tradeType == 0 || postID == homeID || currentPostID == homeID) && 
 								//check if not depot, check if already at home, check if cargo heading home
-										currentPostID != -1 && CheckTraderFaction (trader, postScripts [currentPostID]) && postScripts [currentPostID].allowTrades && CheckFactionsGroups (postScripts [postID], postScripts [currentPostID])) {
-										//check not -1, so can actually get to the trade post, and check that they are in the same faction, check that trading is allowed, and check that faction and group of posts is similar
+										currentPostID != -1 && CheckTraderFaction (trader, postScripts [currentPostID]) && postScripts [currentPostID].allowTrades) {
+										//check not -1, so can actually get to the trade post, and check that they are in the same faction, check that trading is allowed
 										intersect = sell.Intersect (tradeLists [currentPostID].buy).ToList ();
 										for (int i = 0; i<intersect.Count; i++) {//go through all items in intersect
 												BuySell cI = intersect [i];
@@ -774,14 +823,20 @@ namespace TradeSys
 						return quantity;
 				}//end TradeQuantity
 				
-				void SendToPost (Trader trader, int postID)
+				void SendToPost (Trader trader, int postID, bool empty, float time)
 				{//send a trader to a post empty
+						if (trader.empty && empty && trader.startPost == postScripts [postID]) {//if was empty and going back to the same post that it was at before
+								MoveToRandom (trader, trader.postID);//move to a new random post so doesnt get stuck
+								return;
+						}//end if going back to where started and was empty
+						
 						trader.onCall = true;//set to true, so will not be told other posts
 						trader.startPost = trader.finalPost;//set the starting post to the post it is at
 						trader.finalPost = postScripts [postID];//set the final post
 						trader.target = trader.finalPost.gameObject;//set the target gameobject
 						trader.postID = postID;//set the postID
-						StartCoroutine (trader.PauseExit (0));//now pause
+						trader.empty = empty;
+						StartCoroutine (trader.PauseExit (time));//now pause
 				}//end SendToPost
 	
 				public void OnDrawGizmos ()
@@ -838,7 +893,7 @@ namespace TradeSys
 						}//end if in the same faction / group
 				}//end DrawLines
 		
-				public void EditProcess (List<MnfctrGroup> manufacture, int manufactureGroup, int processNumber, bool enabled, int createTime, int cooldownTime)
+				public void EditProcess (List<MnfctrGroup> manufacture, int manufactureGroup, int processNumber, bool enabled, int createTime, int cooldownTime, int price)
 				{//edit the manufacturing process details for a trade post or trader
 
 						//need to check that has received valid changes
@@ -855,6 +910,7 @@ namespace TradeSys
 						editing.enabled = enabled;//set if enabled or not
 						editing.create = createTime;//set the create time
 						editing.cooldown = cooldownTime;//set the cooldown time
+						editing.price = price;//set the price
 						manufacture [manufactureGroup].manufacture [processNumber] = editing;//apply the changes
 				}//end EditProcess
 				

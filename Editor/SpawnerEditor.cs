@@ -50,21 +50,21 @@ namespace TradeSys
 						max = spawnerSO.FindProperty ("max");
 						tot = spawnerSO.FindProperty ("maxSpawn");
 						diff = spawnerSO.FindProperty ("diffItems");
-						countCrates = spawnerSO.FindProperty("countCrates");
+						countCrates = spawnerSO.FindProperty ("countCrates");
 						
 						maxDist = spawnerSO.FindProperty ("maxDist");
 						
-						specifySeed = spawnerSO.FindProperty("specifySeed");
-						seed = spawnerSO.FindProperty("seed");
+						specifySeed = spawnerSO.FindProperty ("specifySeed");
+						seed = spawnerSO.FindProperty ("seed");
 						
-						traderCollect = spawnerSO.FindProperty("traderCollect");
+						traderCollect = spawnerSO.FindProperty ("traderCollect");
 			
 						scrollPos = controllerNormal.scrollPos;
 			
 						GUITools.GetNames (controllerNormal);
 						
-			if(!Application.isPlaying)//only do this if it isnt playin
-						controllerNormal.SortAll ();
+						if (!Application.isPlaying)//only do this if it isnt playin
+								controllerNormal.SortAll ();
 				}//end OnEnable
 	
 				public override void OnInspectorGUI ()
@@ -111,7 +111,7 @@ namespace TradeSys
 								if (GUITools.TitleGroup (new GUIContent ("Number", "Set the number options"), controllerSO.FindProperty ("sNo"), false)) {//if showing number
 				
 										EditorGUILayout.BeginHorizontal ();
-					EditorGUILayout.PropertyField (min, new GUIContent ("Min", "The minumum number to spawn of an item at once (inclusive). Number spawned may be less due to collision checking"));
+										EditorGUILayout.PropertyField (min, new GUIContent ("Min", "The minumum number to spawn of an item at once (inclusive). Number spawned may be less due to collision checking"));
 										EditorGUILayout.PropertyField (max, new GUIContent ("Max", "The maximum number to spawn of an item at once (inclusive)"));
 										EditorGUILayout.EndHorizontal ();
 				
@@ -120,19 +120,19 @@ namespace TradeSys
 										EditorGUILayout.LabelField ("");
 										EditorGUILayout.EndHorizontal ();
 				
-				EditorGUILayout.BeginHorizontal();
+										EditorGUILayout.BeginHorizontal ();
 										EditorGUILayout.PropertyField (diff, new GUIContent ("Separate", "If the number is greater than 1, make each item have a separate crate. Unchecked means that the items in each spawn will all be in one crate."));
-				if(!diff.boolValue)
-				EditorGUILayout.PropertyField(countCrates, new GUIContent("Count crates", "Enable so that the number of crates spawned is counted. Disable so that the total number of items is counted as some spawned crates may contain multiple of that item"));
-				EditorGUILayout.EndHorizontal();
+										if (!diff.boolValue)
+												EditorGUILayout.PropertyField (countCrates, new GUIContent ("Count crates", "Enable so that the number of crates spawned is counted. Disable so that the total number of items is counted as some spawned crates may contain multiple of that item"));
+										EditorGUILayout.EndHorizontal ();
 				
-				EditorGUILayout.BeginHorizontal();
-				EditorGUILayout.PropertyField(specifySeed, new GUIContent("Specify seed", "Specify the seed number used. If disabled, will use a random seed."));
-				if(specifySeed.boolValue)
-				EditorGUILayout.PropertyField(seed, new GUIContent("Seed", "Set the seed number used"));
-				EditorGUILayout.EndHorizontal();
+										EditorGUILayout.BeginHorizontal ();
+										EditorGUILayout.PropertyField (specifySeed, new GUIContent ("Specify seed", "Specify the seed number used. If disabled, will use a random seed."));
+										if (specifySeed.boolValue)
+												EditorGUILayout.PropertyField (seed, new GUIContent ("Seed", "Set the seed number used"));
+										EditorGUILayout.EndHorizontal ();
 				
-				//make sure values are allowed
+										//make sure values are allowed
 										if (min.intValue < 1)
 												min.intValue = 1;
 										else if (min.intValue > max.intValue)
@@ -151,7 +151,7 @@ namespace TradeSys
 										int selected = spawnerNormal.shapeOption;
 										selected = EditorGUILayout.Popup (selected, shapes, "DropDownButton");
 					
-					//the info for the different options. Done here so that the name of the shape can be used
+										//the info for the different options. Done here so that the name of the shape can be used
 										GUIContent[] maxDistInfo = new GUIContent[] {
 												new GUIContent ("Radius", string.Format ("The radius of the {0} to spawn in.", shapes [selected].ToLower ())),
 												new GUIContent ("Side length", string.Format ("The length of a side of the {0} to spawn in.", shapes [selected].ToLower ()))
@@ -165,7 +165,7 @@ namespace TradeSys
 										if (maxDist.floatValue < 0)
 												maxDist.floatValue = 0;
 												
-										EditorGUILayout.PropertyField(traderCollect, new GUIContent("Trader collect", "Select whether a trader is allowed to collect items created at this spawner"));
+										EditorGUILayout.PropertyField (traderCollect, new GUIContent ("Trader collect", "Select whether a trader is allowed to collect items created at this spawner"));
 								}//end if showing shape
 								EditorGUILayout.EndVertical ();
 				#endregion
@@ -173,30 +173,30 @@ namespace TradeSys
 				#endregion
 				
 				#region items
-				case 1:
-				scrollPos.SG = GUITools.EnableDisableItems("Allow item spawn", "expandedT", scrollPos.SG, controllerSO, spawnerSO.FindProperty ("items"), smallScroll, controllerNormal);
-				break;
+						case 1:
+								scrollPos.SG = GUITools.EnableDisableItems ("Allow item spawn", "expandedT", scrollPos.SG, controllerSO, spawnerSO.FindProperty ("items"), smallScroll, controllerNormal);
+								break;
 				#endregion
 						}//end switch
 			
-			if (smallScroll.boolValue)//if small scroll enabled, then end the scroll view
-				EditorGUILayout.EndScrollView ();
+						if (smallScroll.boolValue)//if small scroll enabled, then end the scroll view
+								EditorGUILayout.EndScrollView ();
 			
 						spawnerSO.ApplyModifiedProperties ();
 						controllerSO.ApplyModifiedProperties ();
 						controllerNormal.selected.S = sel;
 						
-						if(GUI.changed)
-						EditorUtility.SetDirty(target);
+						if (GUI.changed)
+								EditorUtility.SetDirty (target);
 				}//end OnInspectorGUI
 				
-		void OnSceneGUI()
-		{
-			Handles.color = Color.green;
-			Handles.matrix = Matrix4x4.TRS (spawnerNormal.transform.position, spawnerNormal.transform.rotation, spawnerNormal.transform.lossyScale);
+				void OnSceneGUI ()
+				{
+						Handles.color = Color.green;
+						Handles.matrix = Matrix4x4.TRS (spawnerNormal.transform.position, spawnerNormal.transform.rotation, spawnerNormal.transform.lossyScale);
 		
-		if(spawnerNormal.shapeOption == 1)//if is a circle
-		Handles.DrawWireDisc(Vector3.zero, Vector3.forward, maxDist.floatValue);
-		}//end OnSceneGUI
+						if (spawnerNormal.shapeOption == 1)//if is a circle
+								Handles.DrawWireDisc (Vector3.zero, Vector3.forward, maxDist.floatValue);
+				}//end OnSceneGUI
 		}//end SpawnerEditor
 }//end namespace

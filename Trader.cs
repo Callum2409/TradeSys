@@ -10,11 +10,11 @@ namespace TradeSys
 		{
 				Controller controller;
 				public GameObject target;//the current target of the trader
-				public TradePost startPost, finalPost;//the final post where the trader will end up
-				public int postID;//the ID of the current post
-				public int homeID;//the ID of the starting post of the trader
-				public bool onCall;//true if the trader has been given a destination post
-				public bool allowGo = false;//whether the trader is allowed to move or not
+				internal TradePost startPost, finalPost;//the final post where the trader will end up
+				internal int postID;//the ID of the current post
+				internal int homeID;//the ID of the starting post of the trader
+				internal bool onCall;//true if the trader has been given a destination post
+				internal bool allowGo = false;//whether the trader is allowed to move or not
 				public bool allowCollect;//whether the trader is allowed to collect dropped items
 				public int cash = 1000;//the amount of money that the trader has to buy items with
 				public double cargoSpace = 10, spaceRemaining;//the cargo space of the trader, and how much is left
@@ -27,6 +27,9 @@ namespace TradeSys
 				public int tradeType = 0;//0 - standard, 1 - depot backhaul, 2 - depot no backhaul
 				public bool dropCargo;//whether cargo can be dropped or not
 				public bool dropSingle;//whether a single item is dropped at a time or all of one item in a crate
+				internal bool empty = true;//if the trader was not carrying anything
+				
+				bool expendable;//if expendable traders has been enabled in the controller
 
 				void Awake ()
 				{
@@ -34,7 +37,9 @@ namespace TradeSys
 						tag = Tags.T;
 						spaceRemaining = cargoSpace;//set the space remaining to be the same as the cargo space, because have no cargo
 						
-			InvokeRepeating ("ManufactureCheck", 0, controller.updateInterval);//check for manufacture changes periodically. do this here so expendables can do it too
+						expendable = controller.expTraders.enabled;
+						
+						InvokeRepeating ("ManufactureCheck", 0, controller.updateInterval);//check for manufacture changes periodically. do this here so expendables can do it too
 				}//end Awake
 	
 				public IEnumerator AtPost ()
@@ -51,12 +56,12 @@ namespace TradeSys
 						//next is done to make sure that the post is able to afford all of the items
 						while(number > 0){//if has more than 0 
 							int cost = Mathf.RoundToInt (stock.price * controller.purchasePercent);
-							if (finalPost.cash >= stock.price * controller.purchasePercent || controller.expTraders.enabled) {//if has enough money to buy the item
+							if (finalPost.cash >= stock.price * controller.purchasePercent || expendable) {//if has enough money to buy the item
 								number --;//remove stock from hold
 								spaceRemaining += cGood.mass;//increase space remaining								
 								stock.number++;//add to trade post
 								
-								if(!controller.expTraders.enabled){//only need to sort prices if not expendable
+								if(!expendable){//only need to sort prices if not expendable
 								finalPost.cash -= cost;//pay for item
 								cash += cost;//receive money
 								if (controller.priceUpdates)//if update after each trade
@@ -73,7 +78,7 @@ namespace TradeSys
 							}//end for items
 						}//end for group
 						
-						if(controller.expTraders.enabled)//if expendable
+			if(expendable)//if expendable
 						DestroyTrader();//destroy the trader
 	
 						if (controller.pauseEnter)//if entry pause
@@ -96,11 +101,12 @@ namespace TradeSys
 				
 		public void ManufactureCheck ()
 		{//go through the manufacturing processes, and if not being made, check that can
-		if(!controller.expTraders.enabled){//if expendable, dont manufacture anything
+			if(!expendable){//if expendable, dont manufacture anything
 				for (int m1 = 0; m1<manufacture.Count; m1++) {//go through manufacture groups
 					for (int m2 = 0; m2<manufacture[m1].manufacture.Count; m2++) {//go through manufacture processes
 						RunMnfctr cMan = manufacture [m1].manufacture [m2];
-						if (cMan.enabled && !cMan.running) {//check that the process is allowed and not currently running
+						if (cMan.enabled && !cMan.running  && cash - cMan.price > 0) {
+						//check that the process is allowed and not currently running and has enough cash
 							if (ResourceCheck (m1, m2)) {//check that has enough resources and check the stock numbers
 								//now needs to follow the process
 								StartCoroutine (Create (m1, m2));//follow the process
@@ -134,6 +140,8 @@ namespace TradeSys
 		{//follow the manufacturing process
 			Mnfctr process = controller.manufacture [groupID].manufacture [processID];//the manufacturing process in the controller
 			RunMnfctr traderMan = manufacture [groupID].manufacture [processID];//the manufacturing process at the trade post
+			
+			cash -= traderMan.price;//remove the amount of money required to run the process
 			
 			//needs to pause before removing the items here so that they dont appear later on, potentially after the trader has been to a trade post
 			
@@ -178,17 +186,20 @@ namespace TradeSys
 		/// </param>
 		/// <param name='cooldownTime'>
 		/// How long before the process is allowed to be run again
-		/// </param>		
-		public void EditProcess (int manufactureGroup, int processNumber, bool enabled, int createTime, int cooldownTime)
+		/// </param>	
+		/// <param name='price'>
+		/// How much the process costs to run. Make negative to receive money
+		/// </param>			
+		public void EditProcess (int manufactureGroup, int processNumber, bool enabled, int createTime, int cooldownTime, int price)
 		{
-			controller.EditProcess (manufacture, manufactureGroup, processNumber, enabled, createTime, cooldownTime);
+			controller.EditProcess (manufacture, manufactureGroup, processNumber, enabled, createTime, cooldownTime, price);
 		}//end EditProcess
 		
-		public void ChangeTradeHome(GameObject post){//used to change which trade post appears as the home post. Only useful for depots
+		public void ChangeTraderHome(GameObject post){//used to change which trade post appears as the home post. Only useful for depots
 			homeID = controller.GetPostID(post);
 		}//end ChangeTradeHome
 		
-		public void ChangeTradeHome(TradePost post){//used to change which trade post appears as the home post. Only useful for depots
+		public void ChangeTraderHome(TradePost post){//used to change which trade post appears as the home post. Only useful for depots
 			homeID = controller.GetPostID(post.gameObject);
 		}//end ChangeTradeHome
 		
@@ -209,7 +220,7 @@ namespace TradeSys
 		
 		public void DestroyTrader(){//destroy the trader
 		//this will get called by expendable trader methods but can be used to remove the trader from the game
-			if(controller.expTraders.enabled)//if expendable
+			if(expendable)//if expendable
 				controller.traderCount--;//reduce the number of traders by one
 			else
 				controller.GetTraderScripts();//else needs to update the list of trader scripts

@@ -123,7 +123,7 @@ namespace TradeSys
 		public class RunMnfctr
 		{//the manufacturing process information for each trade post and trader
 				public bool enabled;
-				public int create, cooldown;
+				public int create, cooldown, price;
 				internal bool running;
 		}
 

@@ -409,11 +409,16 @@ namespace TradeSys
 									
 																		EditorGUILayout.BeginHorizontal ();//horizontal to also show the times
 																		EditorGUILayout.BeginVertical ();//align the name vertically
-																		if (cMan.FindPropertyRelative ("enabled").boolValue)
-																				GUILayout.Space (10f);
 									
+																		if (cMan.FindPropertyRelative ("enabled").boolValue && controller.expTraders.enabled)//if enabled and expendable, have space
+																				GUILayout.Space (10f);
+																																							
 																		EditorGUILayout.PropertyField (cMan.FindPropertyRelative ("enabled"), 
 									                               new GUIContent (cManC.FindPropertyRelative ("name").stringValue, controller.manufactureTooltips [m] [p]));
+																		
+																		if (cMan.FindPropertyRelative ("enabled").boolValue && !controller.expTraders.enabled)//if enabled and not expendable, show price
+																				EditorGUILayout.PropertyField (cMan.FindPropertyRelative ("price"), new GUIContent ("\tPrice", "The cost to manufacture the item. Can be negative so receives money from manufacture"));
+																		
 																		EditorGUILayout.EndVertical ();
 									
 																		if (cMan.FindPropertyRelative ("enabled").boolValue) {//if enabled, allow times to be edited
