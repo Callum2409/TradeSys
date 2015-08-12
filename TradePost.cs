@@ -1,4 +1,3 @@
-//VERSION 1.0
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
@@ -20,11 +19,11 @@ public class Mnfctr
 
 public class TradePost : MonoBehaviour
 {
-	public List<Stock> stock = new List<Stock>();
-	public List<Mnfctr> manufacture = new List<Mnfctr>();
+	public List<Stock> stock = new List<Stock> ();
+	public List<Mnfctr> manufacture = new List<Mnfctr> ();
 	Controller controller;
 	float[] times;
-	public bool showS, showM;
+	public List<bool> allowGoods = new List<bool>();
 	
 	void Start ()
 	{
@@ -37,24 +36,15 @@ public class TradePost : MonoBehaviour
 	
 	public void UpdatePrice ()
 	{				
-		for (int x = 0; x<stock.Count; x++) {//MAY NEED PRICE EDITING
+		for (int x = 0; x<stock.Count; x++) {
 			if (stock [x].number == 0)
 				stock [x].price = controller.goods [x].maxPrice;
-			else {//USED TO DEBUG ERRORS
-				/*int num = controller.goods [x].basePrice;
-				float den = (float)controller.goods [x].average / stock [x].number;
-				int min = controller.goods [x].minPrice;
-				int max = controller.goods [x].maxPrice;
-				
-				stock [x].price = Mathf.Clamp ((int)(num / den), 
-				min, max);*/
-				
+			else {				
 				stock [x].price = Mathf.Clamp ((int)(controller.goods [x].basePrice * 
 				((float)controller.goods [x].average / stock [x].number)), 
 				controller.goods [x].minPrice, controller.goods [x].maxPrice);
 			}
 		}
-		
 	}
 	
 	public void NewPost (int[] manufactureTimes)
@@ -79,7 +69,7 @@ public class TradePost : MonoBehaviour
 		}
 		controller.posts.Add (gameObject);
 		this.gameObject.tag = "Trade Post";
-	}
+	}//end NewPost
 	
 	void Update ()
 	{

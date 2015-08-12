@@ -4,7 +4,8 @@ using System.Collections.Generic;
 using System;
 
 [System.Serializable]
-public class Goods {
+public class Goods
+{
 	public string name;
 	public int basePrice;
 	public int minPrice;
@@ -14,14 +15,16 @@ public class Goods {
 }
 
 [System.Serializable]
-public class Trade {
+public class Trade
+{
 	public GameObject postA;
 	public GameObject postB;
 	public string type;
 }
 
 [System.Serializable]
-public class Trading {
+public class Trading
+{
 	public GameObject sellPost;
 	public GameObject buyPost;
 	public int number;
@@ -29,62 +32,61 @@ public class Trading {
 }
 
 [System.Serializable]
-public class Poss {
+public class Poss
+{
 	public float distance;
 	public int cNo;
 	public int tNo;
 }
 
 [System.Serializable]
-public class NeedMake {
+public class NeedMake
+{
 	public int item;
 	public int number;
 }
 
 [System.Serializable]
-public class Items {
+public class Items
+{
 	public string name;
 	public List<NeedMake> needing;
 	public List<NeedMake> making;
 }
 
-public class SuperBool{
-	public bool showMain;
-	public bool showNeed;
-	public bool showMake;
-}
-
-public class Controller : MonoBehaviour {
+public class Controller : MonoBehaviour
+{
 	#region initialize
+	public bool settings, pauseBeforeStart, expendable, showE;
+	public int maxNoTraders = 100;
+	GameObject allTraders;
+	public List<GameObject> expendableT = new List<GameObject> ();
 	public List<Goods> goods = new List<Goods> ();
-	public List<GameObject> posts;
-	public List<GameObject> traders;
+	public List<GameObject> posts = new List<GameObject> ();
+	public List<GameObject> traders = new List<GameObject> ();
 	List<Trade> buy = new List<Trade> ();
 	List<Trade> sell = new List<Trade> ();
 	List<Trade> compare = new List<Trade> ();
-	public List<Trading> ongoing = new List<Trading> ();
+	internal List<Trading> ongoing = new List<Trading> ();
 	List<Poss> poss = new List<Poss> ();
-	public List<Trade> moving = new List<Trade> ();
-	public List<Items> manufacturing = new List<Items>();
-	
-	public bool showAllG;
-	public List<bool> showSmallG;
-	public bool showAllM;
-	public List<bool> showSmallM;
-	
+	internal List<Trade> moving = new List<Trade> ();
+	public List<Items> manufacturing = new List<Items> ();
+	public bool showAllG, showAllM, showS, showM, showP, showAG;
+	public List<bool> showSmallG = new List<bool> ();
+	public List<bool> showSmallM = new List<bool> ();
 	public List<string> allNames;
 	#endregion
 	
-	void Awake () {		
+	void Awake ()
+	{		
 		posts = new List<GameObject> (GameObject.FindGameObjectsWithTag ("Trade Post"));
-		traders = new List<GameObject> (GameObject.FindGameObjectsWithTag ("Trader"));
+		if (!expendable)
+			traders = new List<GameObject> (GameObject.FindGameObjectsWithTag ("Trader"));
 		
-		for (int x = 0; x <goods.Count; x++) {
-			int total = 0;
-			for (int y = 0; y<posts.Count; y++)
-				total += posts [y].GetComponent<TradePost> ().stock [x].number;
-			goods [x].average = total / posts.Count;
-		}
+		for (int x = 0; x <goods.Count; x++) 
+			Average(x);
+		if (expendable)
+			allTraders = new GameObject ("Traders");
 	}
 	
 	void Update ()
@@ -93,29 +95,40 @@ public class Controller : MonoBehaviour {
 		TradeCall ();
 	}
 	
-	public void UpdateAverage (int productID) {
-		int total = 0;
-		for (int p = 0; p<posts.Count; p++)
-			total += posts [p].GetComponent<TradePost> ().stock [productID].number;
-		goods [productID].average = total / posts.Count;
-		
+	public void UpdateAverage (int productID)
+	{	
+		Average (productID);
 		UpdateLists ();
-		TradeCall ();
 		for (int p = 0; p<posts.Count; p++)
 			posts [p].GetComponent<TradePost> ().UpdatePrice ();
 	}
 	
-	void UpdateLists () {
+	void Average (int productID)
+	{
+		int total = 0;
+		int stocked = 0;
+		for (int p = 0; p<posts.Count; p++) {
+			TradePost postScript = posts [p].GetComponent<TradePost> ();
+			if (postScript.allowGoods [productID]) {
+				total += posts [p].GetComponent<TradePost> ().stock [productID].number;
+				stocked++;
+			}
+		}
+		goods [productID].average = total / stocked;
+	}
+	
+	void UpdateLists ()
+	{
 		for (int g = 0; g<goods.Count; g++) {
 			#region add to lists
 			for (int p = 0; p<posts.Count; p++) {
 				TradePost post = posts [p].GetComponent<TradePost> ();
 				
 				if (post.stock [g].number > Mathf.RoundToInt (goods [g].average * 1.5f) && 
-					!sell.Exists (x => x.postA == posts [p] && x.type == goods [g].name)) 
+					!sell.Exists (x => x.postA == posts [p] && x.type == goods [g].name) && post.allowGoods[g]) 
 					sell.Add (new Trade{postA = posts [p], type = goods [g].name});
 				if (Mathf.RoundToInt (post.stock [g].number * 1.5f) < goods [g].average && 
-					!buy.Exists (x => x.postA == posts [p] && x.type == goods [g].name)) 
+					!buy.Exists (x => x.postA == posts [p] && x.type == goods [g].name) && post.allowGoods[g]) 
 					buy.Add (new Trade{postA = posts [p], type = goods [g].name});
 			}
 			#endregion
@@ -161,7 +174,8 @@ public class Controller : MonoBehaviour {
 		#endregion
 	}
 	
-	bool CheckLocation (GameObject check, GameObject buyPost, string type) {
+	bool CheckLocation (GameObject check, GameObject buyPost, string type)
+	{
 		for (int x = 0; x< compare.Count; x++) {
 			if (compare [x].type == type && compare [x].postB == buyPost) {
 				if (Vector3.Distance (check.transform.position, buyPost.transform.position) >= 
@@ -180,95 +194,123 @@ public class Controller : MonoBehaviour {
 		int cNo = -1;
 		int tNo = -1;
 		bool toAdd;
-		for (int t = 0; t<traders.Count; t++) {
-			Trader traderScript = traders [t].GetComponent<Trader> ();
-			shortest = 0;
-			toAdd = false;
-			if (!traderScript.onCall) {
-				if (compare.Exists (x => x.postA == traderScript.targetPost)) {
+		if (expendable) {
+			for (int c = 0; c<compare.Count; c++) {
+				List<Trade> sameLocations = compare.FindAll (x => x.postA == compare [c].postA && x.postB == compare [c].postB);
+				if (!ongoing.Exists (x => x.buyPost == compare [c].postB && x.type == compare [c].type))
+					TraderSet (null, sameLocations, c);
+			}
+		} else {
+			for (int t = 0; t<traders.Count; t++) {
+				Trader traderScript = traders [t].GetComponent<Trader> ();
+				shortest = 0;
+				toAdd = false;
+				if (!traderScript.onCall) {
+					if (compare.Exists (x => x.postA == traderScript.targetPost)) {
 					#region post in compare
-					int c = compare.FindIndex (x => x.postA == traderScript.targetPost);
-					if (!ongoing.Exists (x => x.buyPost == compare [c].postB && x.type == compare [c].type)) {
-						TradePost postA = compare [c].postA.GetComponent<TradePost> ();
-						
-						int goodsNo = goods.FindIndex (x => x.name == compare [c].type);
-						
-						int average = goods [goodsNo].average;
-						int sellQuantity = postA.stock [goodsNo].number - Mathf.RoundToInt (average * 1.5f);
-						int buyQuantity = average - Mathf.RoundToInt (compare [c].postB.GetComponent<TradePost> ().stock [goodsNo].number * 1.5f);				
-						int quantity = (int)((sellQuantity + buyQuantity)/ 2f);
-						
-						if (quantity > 0) {
-							postA.stock [goodsNo].number -= quantity;
-							postA.UpdatePrice ();
-							
-							ongoing.Add (new Trading{sellPost = compare [c].postA, buyPost = compare [c].postB, number = quantity, type = compare [c].type});
-						
-							traderScript.onCall = true;
-							traderScript.type = compare [c].type;
-							traderScript.quantity = quantity;
-							traderScript.targetPost = compare [c].postB;
-							compare [c].postA.GetComponent<TradePost> ().UpdatePrice ();
-							traderScript.PauseGo ();
-							break;
+						int c = compare.FindIndex (x => x.postA == traderScript.targetPost);
+						List<Trade> sameLocations = compare.FindAll (x => x.postA == traderScript.targetPost && x.postB == compare [c].postB);
+
+						TraderSet (traders [t], sameLocations, c);
 						#endregion
-						} //doesn't need an else because should be removed in the next Update()
-					}//end if not in ongoing
-				} else {//end if post not in compare => need to move to new post
-					for (int c = 0; c<compare.Count; c++) {
-						if (!ongoing.Exists (x => x.buyPost == compare [c].postB && x.type == compare [c].type)) {
-							float distance = Vector3.Distance (traderScript.targetPost.transform.position, compare [c].postA.transform.position);
-							if ((distance < shortest || shortest == 0)) {//check distances
-								if (!poss.Exists (x => x.cNo == c)) {//check that compare has not previously been added
-									shortest = distance;
-									cNo = c;//need to add the distance to array, 
-									tNo = t;//and keep the cNo and tNo because then can add to the poss list at the end of the compare check
-									toAdd = true;
-								} else {
-									int index = poss.FindIndex (x => x.cNo == c);
-									if (distance < poss [index].distance) {//current distance is less than the distance found in the poss list
+					} else {//end if post not in compare => need to move to new post
+						for (int c = 0; c<compare.Count; c++) {
+							if (!ongoing.Exists (x => x.buyPost == compare [c].postB && x.type == compare [c].type) && !moving.Exists (x => x.postB == compare [c].postA)) {
+								float distance = Vector3.Distance (traderScript.targetPost.transform.position, compare [c].postA.transform.position);
+								if ((distance < shortest || shortest == 0)) {//check distances
+									if (!poss.Exists (x => x.cNo == c)) {//check that compare has not previously been added
 										shortest = distance;
+										cNo = c;
 										tNo = t;
+										toAdd = true;
+									} else {
+										int index = poss.FindIndex (x => x.cNo == c);
+										if (distance < poss [index].distance) {//current distance is less
+											shortest = distance;
+											tNo = t;
 										
-									} else {//BUT IF NOT LESS, THEN NONE OF THE PREVIOUS WILL BE EITHER. BUT THE NEXT COULD BE
-										shortest = poss [index].distance;
-										tNo = poss [index].tNo;
-									}
-									cNo = c;
-									poss.RemoveAt (index);
-									toAdd = true;
-								}//need to compare against the previously added compare to find shortest distance
-								//either way, a new entry needs to be added because it either disnt exist, or has been removed.
-								//new entry to be added at the end of the compare for loop
-							}//check that the distance is smaller than the shortest for the trader
-						}//end if not in ongoing
-					}//end for compare
-				}//end if compare not in ongoing
-				//need to add new entry into poss
-				if (toAdd) {
-//					print ("poss.Count = " + poss.Count);
-					poss.Add (new Poss{distance = shortest, cNo = cNo, tNo = tNo});//this will then be checked etc in the next run through
-					toAdd = false;
-//					print ("new poss size is " + poss.Count);
-				}//if still exists after this, needs to be added to a list containing all of the traders that are moving, 
-				//and then add that to this, but will just be a check not exist
-			}//end if not on call
-		}//end for traders
-		//here, the poss list needs to be executed and added to a moving list
-		ExecuteMove ();
+										} else {
+											shortest = poss [index].distance;
+											tNo = poss [index].tNo;
+										}
+										cNo = c;
+										poss.RemoveAt (index);
+										toAdd = true;
+									}//end else compare added
+								}//end check distance
+							}//end if not in ongoing
+						}//end for compare
+					}//end if compare not in ongoing
+					if (toAdd) {
+						poss.Add (new Poss{distance = shortest, cNo = cNo, tNo = tNo});
+						toAdd = false;
+					}
+				}//end if not on call
+			}//end for traders
+			ExecuteMove ();
+		}//end else not expendable
 	}
 	
-	void ExecuteMove () {
-		for (int p = 0; p<poss.Count; p++) {
-			Trader tradeScript = traders [poss [p].tNo].GetComponent<Trader> ();
-			GameObject targetPost = compare [poss [p].cNo].postA;
-				
-			moving.Add (new Trade{postA = tradeScript.targetPost, postB = targetPost, type = tradeScript.name});
-			tradeScript.targetPost = targetPost;
-			tradeScript.onCall = true;
-			tradeScript.quantity = 0;
-			poss.RemoveAt (p);
-			tradeScript.PauseGo ();
+	void TraderSet (GameObject trader, List<Trade> sameLocations, int c)
+	{
+		if (expendable) {
+			if (maxNoTraders == 0 || GameObject.FindGameObjectsWithTag ("Trader").Length < maxNoTraders) {
+				int random = UnityEngine.Random.Range (0, expendableT.Count);
+				if (expendableT [random] == null) {
+					Debug.LogError ("One of your trader types has not been set\nPlease make sure that all trader types have been set");
+					return;
+				}
+				trader = (GameObject)Instantiate (expendableT [random], sameLocations [0].postA.transform.position, Quaternion.identity);
+				trader.transform.parent = allTraders.transform;
+			} else
+				return;
 		}
+		Trader traderScript = trader.GetComponent<Trader> ();
+		
+		for (int a = 0; a < sameLocations.Count; a++) {
+			if (!ongoing.Exists (x => x.buyPost == sameLocations [a].postB && x.type == sameLocations [a].type)) {
+				
+				TradePost postA = sameLocations [a].postA.GetComponent<TradePost> ();
+						
+				int goodsNo = goods.FindIndex (x => x.name == sameLocations [a].type);
+						
+				int average = goods [goodsNo].average;
+				int sellQuantity = postA.stock [goodsNo].number - Mathf.RoundToInt (average * 1.5f);
+				int buyQuantity = average - Mathf.RoundToInt (compare [c].postB.GetComponent<TradePost> ().stock [goodsNo].number * 1.5f);				
+				int quantity = (int)Mathf.Min ((int)((sellQuantity + buyQuantity) / 1.5f), Mathf.Floor (traderScript.spaceRemaining / goods [goodsNo].mass));
+
+				if (quantity > 0) {
+					postA.stock [goodsNo].number -= quantity;
+					postA.UpdatePrice ();
+							
+					ongoing.Add (new Trading{sellPost = sameLocations [a].postA, buyPost = sameLocations [a].postB, number = quantity, type = sameLocations [a].type});
+						
+					traderScript.onCall = true;
+					traderScript.trading.Add (new NoType{number = quantity, type = sameLocations [a].type});
+					traderScript.spaceRemaining = traderScript.cargoSpace - quantity * goods [goodsNo].mass;
+					traderScript.targetPost = sameLocations [a].postB;
+					sameLocations [a].postA.GetComponent<TradePost> ().UpdatePrice ();
+					if (traderScript.spaceRemaining == 0)
+						break;
+				}
+			}//end if not in ongoing
+		}//end for all compares to same location	
+		if (expendable && traderScript.targetPost == null)
+			Destroy (trader);
+	}
+	
+	void ExecuteMove ()
+	{
+		for (int p = 0; p<poss.Count; p++) {
+			if (poss [p].cNo < compare.Count) {
+				Trader traderScript = traders [poss [p].tNo].GetComponent<Trader> ();
+				GameObject targetPost = compare [poss [p].cNo].postA;
+				
+				moving.Add (new Trade{postA = traderScript.targetPost, postB = targetPost, type = traderScript.name});
+				traderScript.targetPost = targetPost;
+				traderScript.onCall = true;
+			}
+		}
+		poss.Clear();
 	}
 }
