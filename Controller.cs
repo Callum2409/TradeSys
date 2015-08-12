@@ -5,6 +5,7 @@ using System.Linq;
 using System;
 using System.IO;
 
+#region variables
 [System.Serializable]
 public class Goods
 {
@@ -17,6 +18,7 @@ public class Goods
 	public int unit;
 	public int postCount;
 	public GameObject itemCrate;
+	public float pausePerUnit;
 }
 
 [System.Serializable]
@@ -101,11 +103,11 @@ public class Faction
 	public string name;
 	public Color color;
 }
-
+#endregion
 public class Controller : MonoBehaviour
 {
 	#region initialize
-	public bool pauseBeforeStart, expendable, allowPickup, allowGroups, allowFactions;//USED IN GAME
+	public bool expendable, allowPickup, allowGroups, allowFactions;//USED IN GAME
 	public int maxNoTraders = 100;
 	GameObject allTraders;
 	public List<GameObject> expendableT = new List<GameObject> ();
@@ -115,10 +117,10 @@ public class Controller : MonoBehaviour
 	public List<TradePost> postScripts = new List<TradePost> ();
 	public List<GameObject> traders = new List<GameObject> ();
 	public List<Trader> traderScripts = new List<Trader> ();
-	List<Trade> buy = new List<Trade> ();
-	List<Trade> sell = new List<Trade> ();
-	List<Trade> compare = new List<Trade> ();
-	internal List<Trading> ongoing = new List<Trading> ();
+	public List<Trade> buy = new List<Trade> ();
+	public List<Trade> sell = new List<Trade> ();
+	public List<Trade> compare = new List<Trade> ();
+	public List<Trading> ongoing = new List<Trading> ();
 	List<Poss> poss = new List<Poss> ();
 	internal List<Trade> moving = new List<Trade> ();
 	public List<Items> manufacturing = new List<Items> ();
@@ -132,8 +134,16 @@ public class Controller : MonoBehaviour
 	public float updateInterval = 0.5f;
 	public List<String> groups = new List<String> ();
 	public List<Faction> factions = new List<Faction> ();
+	public string[] pauseOptions = {"Set time", "Trader specific time", "Cargo mass", "Cargo mass specific"};
+	public int pauseOption = 1;
+	public float pauseTime = 2;
+	public bool pauseOnEnter, pauseOnExit;
+	//next two used to make editor faster by not having to load all of the prefab traders
+	public string[] directories = new string[]{};
+	public List<GameObject> traderPrefabs = new List<GameObject>();
+	public bool loadTraderPrefabs;
 	#endregion
-	
+
 	void Awake ()
 	{		
 		posts = new List<GameObject> (GameObject.FindGameObjectsWithTag ("Trade Post"));
@@ -145,7 +155,7 @@ public class Controller : MonoBehaviour
 			for (int t = 0; t<traders.Count; t++) {
 				traderScripts.Add (traders [t].GetComponent<Trader> ());
 				if (traderScripts [t] == null)
-					Debug.LogError ("One of the traders does not have a Trader component.\nPlease add the Trader script to " + traders[t].name);
+					Debug.LogError ("One of the traders does not have a Trader component.\nPlease add the Trader script to " + traders [t].name);
 			}
 		}
 		
@@ -154,7 +164,6 @@ public class Controller : MonoBehaviour
 			Average (x);
 		if (expendable)
 			allTraders = new GameObject ("Traders");
-		
 		InvokeRepeating ("UpdateMethods", 0, updateInterval);
 	}
 	
@@ -163,7 +172,7 @@ public class Controller : MonoBehaviour
 		for (int p = 0; p<postScripts.Count; p++)
 			postScripts [p].UpdatePrice ();
 		
-		UpdateLists ();
+UpdateLists ();
 		TradeCall ();
 	}
 	
@@ -235,10 +244,10 @@ public class Controller : MonoBehaviour
 		#region add to compare
 		for (int s=0; s<sell.Count; s++) {
 			for (int b = 0; b<buy.Count; b++) {
-				if (sell [s].typeID == buy [b].typeID &&
-					CheckGroupsFactions (postScripts[buy [b].postB], postScripts[sell [s].postA]) &&
-					CheckLocation (sell [s].postA, buy [b].postB, sell [s].typeID)) {
-					compare.Add (new Trade{postA = sell [s].postA, postB = buy [b].postB, typeID = sell [s].typeID});
+				if (sell [s].typeID == buy [b].typeID && CheckGroupsFactions (postScripts [buy [b].postB], postScripts [sell [s].postA])) {
+					if (CheckLocation (sell [s].postA, buy [b].postB, sell [s].typeID)) {
+						compare.Add (new Trade{postA = sell [s].postA, postB = buy [b].postB, typeID = sell [s].typeID});
+					}
 				}
 			}
 		}
@@ -308,7 +317,7 @@ public class Controller : MonoBehaviour
 				for (int c = 0; c<compare.Count; c++) {
 					List<Trade> sameLocations = compare.FindAll (x => x.postA == compare [c].postA && x.postB == compare [c].postB);
 					if (!ongoing.Exists (x => x.buyPost == posts [compare [c].postB] && x.typeID == compare [c].typeID))
-						TraderSet (null, sameLocations, c, 0);
+						StartCoroutine (TraderSet (null, sameLocations, c, 0));
 				}
 			}
 		} else {
@@ -321,17 +330,17 @@ public class Controller : MonoBehaviour
 					if (compare.Exists (x => posts [x.postA] == traderScript.target)) {
 					#region post in compare
 						int c = compare.FindIndex (x => posts [x.postA] == traderScript.target);
-						if (TraderFaction (traderScript, postScripts[compare [c].postB])) {
+						if (TraderFaction (traderScript, postScripts [compare [c].postB])) {
 							List<Trade> sameLocations = compare.FindAll (x => posts [x.postA] == traderScript.target && x.postB == compare [c].postB);
 
-							TraderSet (traders [t], sameLocations, c, t);
+							StartCoroutine (TraderSet (traders [t], sameLocations, c, t));
 						}//check trader in same faction
 					#endregion
 					} else {//end if post not in compare => need to move to new post
 						for (int c = 0; c<compare.Count; c++) {
 							TradePost comparePostScript = postScripts [compare [c].postA];
 							if (!ongoing.Exists (x => x.buyPost == posts [compare [c].postB] && x.typeID == compare [c].typeID) && !moving.Exists (x => x.postB == compare [c].postA) &&
-								CheckGroupsFactions (targetScript, comparePostScript) && TraderFaction(traderScript, comparePostScript)) {
+								CheckGroupsFactions (targetScript, comparePostScript) && TraderFaction (traderScript, comparePostScript)) {
 								float distance = Vector3.Distance (traderScript.target.transform.position, posts [compare [c].postA].transform.position);
 								if ((distance < shortest || shortest == 0)) {//check distances
 									if (!poss.Exists (x => x.cNo == c)) {//check that compare has not previously been added
@@ -367,7 +376,7 @@ public class Controller : MonoBehaviour
 		}//end else not expendable
 	}
 	
-	void TraderSet (GameObject trader, List<Trade> sameLocations, int c, int traderID)
+	IEnumerator TraderSet (GameObject trader, List<Trade> sameLocations, int c, int traderID)
 	{
 		int random = 0;
 		if (expendable) {
@@ -375,24 +384,24 @@ public class Controller : MonoBehaviour
 				random = UnityEngine.Random.Range (0, expendableT.Count);
 				if (expendableT [random] == null) {
 					Debug.LogError ("One of your trader types has not been set\nPlease make sure that all trader types have been set");
-					return;
+					yield break;
 				}
 				trader = (GameObject)Instantiate (expendableT [random], posts [sameLocations [0].postA].transform.position, Quaternion.identity);
 				trader.transform.parent = allTraders.transform;
 			} else
-				return;
+				yield break;
 			traderID = random;
 		}
 		
 		Trader traderScript;
-		if (expendable){ 
-			traderScript = trader.GetComponent<Trader>( );
-			traderScripts.Add(traderScript);
-		}else
+		if (expendable) { 
+			traderScript = trader.GetComponent<Trader> ();
+			traderScripts.Add (traderScript);
+			traderScript.expendable = true;
+		} else
 			traderScript = traderScripts [traderID];
-		
 		for (int a = 0; a < sameLocations.Count; a++) {
-			if (!ongoing.Exists (x => x.buyPost == posts [sameLocations [a].postB] && x.typeID == sameLocations [a].typeID)) {
+			if (!ongoing.Exists (x => x.buyPost == posts [sameLocations [a].postB] && x.typeID == sameLocations [a].typeID) && c < compare.Count) {
 				
 				TradePost postA = postScripts [sameLocations [a].postA];
 						
@@ -405,10 +414,13 @@ public class Controller : MonoBehaviour
 
 				if (quantity > 0) {
 					postA.stock [goodsNo].number -= quantity;
-							
-					ongoing.Add (new Trading{sellPost = posts [sameLocations [a].postA], buyPost = posts [sameLocations [a].postB], number = quantity, typeID = sameLocations [a].typeID});
-						
 					traderScript.onCall = true;
+					
+					if ((pauseOption == 2 || pauseOption == 3) && pauseOnExit)
+						yield return new WaitForSeconds(goodsArray[goodsNo].pausePerUnit*quantity);//pause to load goods
+					
+					ongoing.Add (new Trading{sellPost = posts [sameLocations [a].postA], buyPost = posts [sameLocations [a].postB], number = quantity, typeID = goodsNo});
+						
 					traderScript.trading.Add (new NoType{number = quantity, goodID = sameLocations [a].typeID});
 					traderScript.spaceRemaining -= quantity * (float)goodsArray [goodsNo].mass;
 					traderScript.finalPost = traderScript.target = posts [sameLocations [a].postB];
@@ -418,9 +430,12 @@ public class Controller : MonoBehaviour
 				}
 			}//end if not in ongoing
 		}//end for all compares to same location	
-		if (expendable && traderScript.target == null){
-			traderScripts.Remove(traderScript);
-			Destroy (trader);}
+		if (expendable && traderScript.target == null) {
+			traderScripts.Remove (traderScript);
+			Destroy (trader);
+		}
+		if (traderScript.trading.Count > 0)
+			traderScript.ExitPause ();
 	}
 	
 	void ExecuteMove ()
@@ -433,6 +448,7 @@ public class Controller : MonoBehaviour
 				moving.Add (new Trade{postA = posts.FindIndex (x => x == traderScript.target), postB = posts.FindIndex (x => x == target), typeID = traders.FindIndex (x => x == traders [poss [p].tNo])});
 				traderScript.finalPost = traderScript.target = target;
 				traderScript.onCall = true;
+				traderScript.ExitPause ();
 			}
 		}
 		poss.Clear ();
@@ -440,12 +456,12 @@ public class Controller : MonoBehaviour
 	
 	bool TraderFaction (Trader traderScript, TradePost targetPost)
 	{
-		if(!allowFactions)
+		if (!allowFactions)
 			return true;
-		else{
+		
 		for (int f = 0; f<factions.Count; f++)
-			if (traderScript.factions [f] && targetPost.factions [f])return true;
+			if (traderScript.factions [f] && targetPost.factions [f])
+				return true;
 		return false;
-		}
 	}
 }

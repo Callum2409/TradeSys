@@ -215,10 +215,11 @@ public class PostEditor : Editor
 					if (post.manufacture [m].allow) {
 						EditorGUI.indentLevel = 1;
 						EditorGUILayout.BeginHorizontal ();
-						post.manufacture [m].seconds = EditorGUILayout.IntField ("Seconds to create", post.manufacture [m].seconds);
-						EditorGUILayout.LabelField ("");
+						post.manufacture [m].create = EditorGUILayout.IntField (new GUIContent("Seconds to create", "This is the time taken for the item(s) to be manufactured."), post.manufacture [m].create);
+						post.manufacture [m].cooldown = EditorGUILayout.IntField (new GUIContent("Seconds for cooldown", "This is the time taken before the manufacturing process can be done again."), post.manufacture [m].cooldown);
 						EditorGUILayout.EndHorizontal ();
-						post.manufacture [m].seconds = (int)Mathf.Clamp (post.manufacture [m].seconds, 1, Mathf.Infinity);
+						post.manufacture [m].create = (int)Mathf.Clamp (post.manufacture [m].create, 1, Mathf.Infinity);
+						post.manufacture [m].cooldown = (int)Mathf.Clamp (post.manufacture [m].cooldown, 0, Mathf.Infinity);
 					}
 				} else {
 					post.manufacture [m].allow = false;
@@ -227,7 +228,7 @@ public class PostEditor : Editor
 		}
 		#endregion
 		if (GUI.changed)
-			EditorUtility.SetDirty(post);
+			EditorUtility.SetDirty (post);
 	}
 	
 	bool Check (List<NeedMake> mnfctr)

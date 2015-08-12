@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEditor;
 using System.Collections.Generic;
 using System;
+using System.Linq;
 
 [CustomEditor(typeof(Controller))]
 public class ControllerEditor : Editor
@@ -11,25 +12,29 @@ public class ControllerEditor : Editor
 	TradePost[] postScripts;
 	GameObject[] spawners;
 	string[] directories;
-	List<GameObject> traders = new List<GameObject>();
+	List<GameObject> traders = new List<GameObject> ();
 	Trader[] traderScripts;
+	int traderCount;
+	bool reloading;
 	
 	void Awake ()
 	{
 		posts = GameObject.FindGameObjectsWithTag ("Trade Post");
 		postScripts = new TradePost[posts.Length];
 		spawners = GameObject.FindGameObjectsWithTag ("Spawner");
-		traders = new List<GameObject>(GameObject.FindGameObjectsWithTag ("Trader"));
+		traders = new List<GameObject> (GameObject.FindGameObjectsWithTag ("Trader"));
 		controller = (Controller)target;
 		directories = AssetDatabase.GetAllAssetPaths ();//get all assets so item crate finder works
 		
-		for (int d = 0; d<directories.Length; d++) {
-			GameObject asset = (GameObject)AssetDatabase.LoadAssetAtPath (directories [d], typeof(GameObject));
-			if (asset != null && asset.tag == "Trader") {
-				traders.Add(asset);
-			} 
-		}
-		
+		if (!controller.directories.SequenceEqual (directories) && !reloading && (controller.loadTraderPrefabs || controller.expendable)) {//check if directories are the same, so dont have to reload		
+			controller.directories = directories;
+			if (!ProgressBar ()) {
+				Debug.LogWarning("Trader prefab loading was not allowed to complete. Load trader prefabs and expendable traders have been disabled.");
+				controller.loadTraderPrefabs = false;
+				controller.expendable = false;
+			}
+		} else//end same directories check
+			traders.AddRange (controller.traderPrefabs);
 		traderScripts = new Trader[traders.Count];
 		
 		while (controller.showSmallG.Count != controller.goods.Count) {
@@ -82,7 +87,8 @@ public class ControllerEditor : Editor
 			}//end while not correct number of items in spawner
 		}//end for spawners
 		for (int t = 0; t<traders.Count; t++) {
-			Trader trader = traderScripts [t] = traders [t].GetComponent<Trader> ();
+			traderScripts [t] = traders [t].GetComponent<Trader> ();
+			Trader trader = traderScripts [t];
 			while (trader.factions.Count != controller.factions.Count) {
 				if (trader.factions.Count > controller.factions.Count) {
 					trader.factions.RemoveAt (trader.factions.Count - 1);
@@ -97,17 +103,30 @@ public class ControllerEditor : Editor
 	{
 		EditorGUILayout.BeginHorizontal ();
 		GUILayout.FlexibleSpace ();
-		controller.selC = GUILayout.Toolbar (controller.selC, new string[]{"Settings", "Goods", "Manufacturing", "Overview"});
+		if (Application.isPlaying)
+			controller.selC = GUILayout.Toolbar (controller.selC, new string[]{"Settings", "Goods", "Manufacturing", "Overview", "Extra info"});
+		else
+			controller.selC = GUILayout.Toolbar (controller.selC, new string[]{"Settings", "Goods", "Manufacturing", "Overview"});
 		GUILayout.FlexibleSpace ();
 		EditorGUILayout.EndHorizontal ();
 		
+		switch (controller.selC) {
 		#region settings				
-		if (controller.selC == 0) {		
+		case 0:	
 			EditorGUI.indentLevel = 0;
 			
 			EditorGUILayout.BeginHorizontal ();
 			controller.updateInterval = Mathf.Max (EditorGUILayout.FloatField (new GUIContent ("Update interval", "This is the time between updates of the prices at trade posts and possible trades"), controller.updateInterval), 0.01f);
-			EditorGUILayout.LabelField ("");
+			
+			if (!controller.expendable) {//can only disable loading if expendable traders is disabled
+				bool lTPB = controller.loadTraderPrefabs;
+				controller.loadTraderPrefabs = EditorGUILayout.Toggle (new GUIContent ("Load trader prefabs", "If enabled, when an asset is added or removed, the trader prefabs will be reloaded to ensure that all of the trader prefabs get updated. Disabling will mean that it is not reloaded."), controller.loadTraderPrefabs);
+			
+				if (!lTPB && controller.loadTraderPrefabs)
+				if (!reloading && !ProgressBar ())
+					controller.loadTraderPrefabs = false;
+			} else
+				EditorGUILayout.LabelField ("");
 			EditorGUILayout.EndHorizontal ();
 			
 			controller.allowPickup = EditorGUILayout.Toggle (new GUIContent ("Allow item pickup", "Allow the pickup of items from spawners or dropped items. Cannot be disabled if there are spawners, trader pickup is enabled individually"), controller.allowPickup);
@@ -121,24 +140,78 @@ public class ControllerEditor : Editor
 			EditorGUILayout.EndHorizontal ();
 			#endregion
 			
+			#region pause options
+			EditorGUILayout.BeginVertical ("HelpBox");
+			EditorGUI.indentLevel = 0;
+			EditorGUILayout.BeginHorizontal ();
+			controller.pauseOption = EditorGUILayout.Popup ("Pause option", controller.pauseOption, controller.pauseOptions, "DropDownButton");
+			switch (controller.pauseOption) {
+			case 0:
+				controller.pauseTime = EditorGUILayout.FloatField ("Pause time", controller.pauseTime);
+				break;
+			case 2:
+				string unit = "1";
+				for (int u = 0; u<controller.units.Count; u++)
+					if (controller.units [u].min <= 1 && controller.units [u].max > 1) {
+						unit = controller.units [u].suffix;
+						break;
+					}
+				controller.pauseTime = EditorGUILayout.FloatField ("Pause time per " + unit, controller.pauseTime);
+				break;
+			}
+			controller.pauseTime = Mathf.Max (0f, controller.pauseTime);
+			if (controller.pauseOption == 0)
+				for (int t = 0; t<traderScripts.Length; t++)
+					traderScripts [t].stopTime = controller.pauseTime;
+			if (controller.pauseOption == 2)
+				for (int g = 0; g<controller.goods.Count; g++)
+					controller.goods [g].pausePerUnit = controller.pauseTime * controller.goods [g].mass;
+			EditorGUILayout.EndHorizontal ();
+			EditorGUILayout.BeginHorizontal ();
+			string en = "Pause on entry";
+			string ex = "Pause on exit";
+			string enTo = "Pause when a trader enters a trade post.";
+			string exTo = "Pause when a trader exits a trade post.";
+			if (controller.pauseOption > 1) {
+				en = "Pause for unloading";
+				ex = "Pause for loading";
+				enTo = "Pause when a trader unloads cargo.";
+				exTo = "Pause when a trader loads cargo.";
+			}
+			controller.pauseOnEnter = EditorGUILayout.Toggle (new GUIContent (en, enTo), controller.pauseOnEnter);
+			controller.pauseOnExit = EditorGUILayout.Toggle (new GUIContent (ex, exTo), controller.pauseOnExit);
+			EditorGUILayout.EndHorizontal ();
+			EditorGUILayout.EndVertical ();
+			#endregion
+			
 			#region expendable traders
 			if (controller.expendable)
 				EditorGUILayout.BeginVertical ("HelpBox");
+			bool eB = controller.expendable;
 			controller.expendable = EditorGUILayout.Toggle ("Expendable traders", controller.expendable);
+			if (!eB && controller.expendable && !controller.loadTraderPrefabs) {
+				if (!reloading && !ProgressBar ())
+					controller.expendable = false;
+			}
 			
 			if (controller.expendable) {
 				EditorGUI.indentLevel = 0;
-				EditorGUILayout.BeginHorizontal ();
-				controller.pauseBeforeStart = EditorGUILayout.Toggle ("Pause before leave", controller.pauseBeforeStart);				
+				EditorGUILayout.BeginHorizontal ();				
 				controller.maxNoTraders = EditorGUILayout.IntField ("Max no. traders", controller.maxNoTraders);
 				controller.maxNoTraders = (int)Mathf.Clamp (controller.maxNoTraders, 0, Mathf.Infinity);
+				EditorGUILayout.LabelField ("");
 				EditorGUILayout.EndHorizontal ();
 				
 				EditorGUILayout.BeginHorizontal ();
 				EditorGUILayout.LabelField ("Trader types: " + controller.expendableT.Count);
-				if (GUILayout.Button ("Add", EditorStyles.miniButton)) {
+				if (GUILayout.Button ("Add", EditorStyles.miniButtonLeft)) {
 					Undo.RegisterUndo ((Controller)target, "Add new trader type");
 					controller.expendableT.Add (null);
+					controller.showE = true;
+				}
+				if (GUILayout.Button ("Load all", EditorStyles.miniButtonRight)) {
+					Undo.RegisterUndo ((Controller)target, "Load all trader prefabs");
+					controller.expendableT = new List<GameObject> (controller.traderPrefabs);
 					controller.showE = true;
 				}
 				EditorGUILayout.EndHorizontal ();
@@ -323,10 +396,10 @@ public class ControllerEditor : Editor
 			GUILayout.EndVertical ();
 			
 		#endregion
-		}
+			break;
 		#endregion
 		#region goods
-		if (controller.selC == 1) {			
+		case 1:		
 			EditorGUILayout.BeginHorizontal ();
 			EditorGUI.indentLevel = 0;
 			EditorGUILayout.LabelField ("Number of types", controller.goods.Count.ToString ());
@@ -394,19 +467,29 @@ public class ControllerEditor : Editor
 					controller.goods [g].mass = Mathf.Clamp (EditorGUILayout.FloatField ("Mass" + unit, controller.goods [g].mass), 0.000001f, Mathf.Infinity);
 					controller.goods [g].name = name;
 					EditorGUILayout.EndHorizontal ();
-					
+					if (controller.pauseOption == 3) {
+						EditorGUILayout.BeginHorizontal ();
+						controller.goods [g].pausePerUnit = Mathf.Max (EditorGUILayout.FloatField ("Unload time", controller.goods [g].pausePerUnit), 0);
+						EditorGUILayout.LabelField ("");
+						EditorGUILayout.EndHorizontal ();
+					}
 					if (controller.allowPickup) {
 						EditorGUILayout.BeginHorizontal ();
-						controller.goods [g].itemCrate = (GameObject)EditorGUILayout.ObjectField (new GUIContent ("Item crate", "This is what the item looks like when you see it in the game, so is likely to be in a box or crate"), controller.goods [g].itemCrate, typeof(GameObject), false);
-						if (GUILayout.Button (new GUIContent ("Find crate", "Find an item crate. The name of the GameObject needs to be exactly the same as the name of the item."), EditorStyles.miniButton)) {
+						controller.goods [g].itemCrate = (GameObject)EditorGUILayout.ObjectField (new GUIContent ("Item crate", 
+							"This is what the item looks like when you see it in the game, so is likely to be in a box or crate"), controller.goods [g].itemCrate, typeof(GameObject), false);
+						if (GUILayout.Button (new GUIContent ("Find crate", "Find an item crate. The name of the GameObject " +
+							"needs to be exactly the same as the name of the item."), EditorStyles.miniButton)) {
 							Undo.RegisterUndo ((Controller)target, "Find item crate");
 							for (int d = 0; d<directories.Length; d++) {
+								if (EditorUtility.DisplayCancelableProgressBar ("Searching", "Searching for GameObject called " + controller.goods [g].name, d / (directories.Length * 1f)))
+									break;
 								GameObject asset = (GameObject)AssetDatabase.LoadAssetAtPath (directories [d], typeof(GameObject));
 								if (asset != null && asset.name == controller.goods [g].name) {
 									controller.goods [g].itemCrate = asset;
 									break;
 								} 
 							}
+							EditorUtility.ClearProgressBar ();
 							if (controller.goods [g].itemCrate == null)
 								Debug.LogWarning ("Could not find an item crate.\nPlease make sure that the item crate has the same name as the item.");
 						}
@@ -446,11 +529,10 @@ public class ControllerEditor : Editor
 					AddStock (0);
 				}
 			}
-				
-		}//end if showing goods
+			break;	
 		#endregion
 		#region manufacturing
-		if (controller.selC == 2) {
+		case 2:
 			EditorGUI.indentLevel = 0;
 			
 			EditorGUILayout.BeginHorizontal ();
@@ -480,16 +562,18 @@ public class ControllerEditor : Editor
 				float[] inf = new float[controller.goods.Count];
 				float total = 0;
 				for (int p = 0; p<posts.Length; p++) {
+					EditorUtility.DisplayProgressBar ("Checking", "Checking manufacturing", p / (posts.Length * 1f));
 					for (int m = 0; m<controller.manufacturing.Count; m++) {
 						TradePost post = postScripts [p];
 						if (post.manufacture [m].allow) {
 							for (int i = 0; i<controller.manufacturing[m].needing.Count; i++) 
-								inf [controller.manufacturing [m].needing [i].item] -= (controller.manufacturing [m].needing [i].number / (post.manufacture [m].seconds * 1f));
+								inf [controller.manufacturing [m].needing [i].item] -= (controller.manufacturing [m].needing [i].number / ((post.manufacture [m].create+post.manufacture[m].cooldown) * 1f));
 							for (int i = 0; i<controller.manufacturing[m].making.Count; i++)
-								inf [controller.manufacturing [m].making [i].item] += (controller.manufacturing [m].making [i].number / (post.manufacture [m].seconds * 1f));
+								inf [controller.manufacturing [m].making [i].item] += (controller.manufacturing [m].making [i].number / ((post.manufacture [m].create+post.manufacture[m].cooldown) * 1f));
 						}
 					}
 				}
+				EditorUtility.ClearProgressBar ();
 				string show = "NOTE: This can only act as a guide because there may be pauses in manufacturing if there " +
 					"are not enough items, so there will be some variances.\n\n" +
 					"It is useful to give an idea of whether the number of each item is expected to increase, decrease " +
@@ -596,10 +680,10 @@ public class ControllerEditor : Editor
 					GUILayout.EndVertical ();
 				}
 			}//end for all manufacturing
-		}//end if showing manufacturing
+			break;
 		#endregion
 		#region Overview
-		if (controller.selC == 3) {
+		case 3:
 			EditorGUI.indentLevel = 0;
 			
 			EditorGUILayout.BeginHorizontal ();
@@ -758,7 +842,6 @@ public class ControllerEditor : Editor
 				GUILayout.EndVertical ();
 			}			
 			#endregion
-			
 			#region manufacturing totals
 			{
 				EditorGUI.indentLevel = 0;
@@ -793,8 +876,213 @@ public class ControllerEditor : Editor
 			}
 			GUILayout.EndVertical ();
 			#endregion
-		}//end if showing overview
+			break;
 		#endregion
+		#region Extra info
+		case 4:
+			EditorGUI.indentLevel = 0;
+			
+			GUILayout.BeginVertical ("HelpBox");
+			if (GUILayout.Button ("Please see the manual for what each category is showing.\nClick here to open", "LODRendererAddButton"))
+				Application.OpenURL ((Application.dataPath) + "/TradeSys/Manual.pdf");
+			GUILayout.EndVertical ();
+			
+			EditorGUILayout.BeginHorizontal ();
+			controller.showHoriz = EditorGUILayout.Toggle ("Show items vertically", controller.showHoriz, "Radio");
+			controller.showHoriz = !EditorGUILayout.Toggle ("Show items horizontally", !controller.showHoriz, "Radio");
+			EditorGUILayout.EndHorizontal ();
+			
+			#region list totals
+			EditorGUI.indentLevel = 0;
+			EditorGUILayout.BeginVertical ("HelpBox");
+			EditorGUILayout.LabelField ("List totals", EditorStyles.boldLabel);
+			EditorGUI.indentLevel = 1;
+			EditorGUILayout.BeginHorizontal ();
+			EditorGUILayout.LabelField ("Sell list", "" + controller.sell.Count);
+			EditorGUILayout.LabelField ("Buy list", "" + controller.buy.Count);
+			EditorGUILayout.EndHorizontal ();
+			EditorGUILayout.LabelField ("Compare list", "" + controller.compare.Count);
+			EditorGUILayout.EndVertical ();
+			#endregion
+			
+			#region item totals
+			{		
+				EditorGUI.indentLevel = 0;
+				EditorGUILayout.BeginVertical ("HelpBox");
+				EditorGUILayout.LabelField ("Item totals", EditorStyles.boldLabel);
+				EditorGUI.indentLevel = 1;
+				int[] total = new int[controller.goods.Count];
+				int[] count = new int[controller.goods.Count];
+				for (int g = 0; g<controller.goods.Count; g++) {
+					if (!Application.isPlaying) {
+						for (int p = 0; p<posts.Length; p++) { 
+							if (postScripts [p].stock [g].allow) {
+								total [g] += postScripts [p].stock [g].number;
+								count [g]++;
+							}
+						}
+					} else {
+						total [g] = Mathf.RoundToInt (controller.goods [g].average * controller.goods [g].postCount);
+						count [g] = controller.goods [g].postCount;
+					}
+				}//end for get totals
+				if (!controller.showHoriz) {
+					for (int g = 0; g<controller.goods.Count; g=g+2) {
+						EditorGUILayout.BeginHorizontal ();
+						EditorGUILayout.LabelField (controller.goods [g].name, "" + count [g] + ", " + total [g] + ", " + controller.goods [g].average.ToString ("F2"));
+						if (g < controller.goods.Count - 1)
+							EditorGUILayout.LabelField (controller.goods [g + 1].name, "" + count [g + 1] + ", " + total [g + 1] + ", " + controller.goods [g + 1].average.ToString ("F2"));
+						EditorGUILayout.EndHorizontal ();
+					}
+				} else {
+					int half = Mathf.CeilToInt (controller.goods.Count / 2f);
+					for (int g = 0; g<half; g++) {
+						EditorGUILayout.BeginHorizontal ();
+						EditorGUILayout.LabelField (controller.goods [g].name, "" + count [g] + ", " + total [g] + ", " + controller.goods [g].average.ToString ("F2"));
+						if (half + g < controller.goods.Count)
+							EditorGUILayout.LabelField (controller.goods [half + g].name, "" + count [half + g] + ", " + total [half + g] + ", " + controller.goods [half + g].average.ToString ("F2"));
+						EditorGUILayout.EndHorizontal ();
+					}
+				}
+				long totalAll = 0;
+				for (int t = 0; t<total.Length; t++)
+					totalAll += total [t];
+				EditorGUI.indentLevel = 0;
+				EditorGUILayout.LabelField ("Total number of items: ", "" + totalAll);
+				GUILayout.EndVertical ();
+			}
+			#endregion
+			
+			#region trading
+			EditorGUI.indentLevel = 0;
+			EditorGUILayout.BeginVertical ("HelpBox");
+			EditorGUILayout.LabelField ("Trading totals", EditorStyles.boldLabel);
+			EditorGUI.indentLevel = 1;
+			{
+				int[] total = new int[controller.goods.Count];
+				int[] count = new int[controller.goods.Count];
+				
+				for (int o = 0; o<controller.ongoing.Count; o++) {
+					total [controller.ongoing [o].typeID] += controller.ongoing [o].number;
+					count [controller.ongoing [o].typeID]++;
+				}
+				
+				if (!controller.showHoriz) {
+					for (int g = 0; g<controller.goods.Count; g=g+2) {
+						EditorGUILayout.BeginHorizontal ();
+						EditorGUILayout.LabelField (controller.goods [g].name, "" + count [g] + ", " + total [g]);
+						if (g < controller.goods.Count - 1)
+							EditorGUILayout.LabelField (controller.goods [g + 1].name, "" + count [g + 1] + ", " + total [g + 1]);
+						EditorGUILayout.EndHorizontal ();
+					}
+				} else {
+					int half = Mathf.CeilToInt (controller.goods.Count / 2f);
+					for (int g = 0; g<half; g++) {
+						EditorGUILayout.BeginHorizontal ();
+						EditorGUILayout.LabelField (controller.goods [g].name, "" + count [g] + ", " + total [g]);
+						if (half + g < controller.goods.Count)
+							EditorGUILayout.LabelField (controller.goods [half + g].name, "" + count [half + g] + ", " + total [half + g]);
+						EditorGUILayout.EndHorizontal ();
+					}
+				}
+			}
+			EditorGUI.indentLevel = 0;
+			EditorGUILayout.LabelField ("Total trades", "" + controller.ongoing.Count);
+			EditorGUILayout.EndVertical ();
+			#endregion
+			#region spawned
+			if (spawners.Length > 0) {
+				EditorGUI.indentLevel = 0; 
+				EditorGUILayout.BeginVertical ("HelpBox");
+				EditorGUILayout.LabelField ("Spawned totals", EditorStyles.boldLabel);
+				EditorGUI.indentLevel = 1;
+				int[] count = new int[controller.goods.Count];
+				for (int s = 0; s<controller.spawned.Count; s++)
+					count [controller.spawned [s].goodID]++;
+				
+				if (!controller.showHoriz) {
+					for (int g = 0; g<controller.goods.Count; g=g+2) {
+						EditorGUILayout.BeginHorizontal ();
+						EditorGUILayout.LabelField (controller.goods [g].name, "" + count [g]);
+						if (g < controller.goods.Count - 1)
+							EditorGUILayout.LabelField (controller.goods [g + 1].name, "" + count [g + 1]);
+						EditorGUILayout.EndHorizontal ();
+					}
+				} else {
+					int half = Mathf.CeilToInt (controller.goods.Count / 2f);
+					for (int g = 0; g<half; g++) {
+						EditorGUILayout.BeginHorizontal ();
+						EditorGUILayout.LabelField (controller.goods [g].name, "" + count [g]);
+						if (half + g < controller.goods.Count)
+							EditorGUILayout.LabelField (controller.goods [half + g].name, "" + count [half + g]);
+						EditorGUILayout.EndHorizontal ();
+					}
+				}
+				EditorGUI.indentLevel = 0;
+				EditorGUILayout.LabelField ("Total spawned", "" + controller.spawned.Count);
+				EditorGUILayout.EndVertical ();
+			}//end if spawners in scene
+			#endregion
+			#region trader totals
+			{
+				EditorGUI.indentLevel = 0; 
+				EditorGUILayout.BeginVertical ("HelpBox");
+				EditorGUILayout.LabelField ("Traders", EditorStyles.boldLabel);
+				
+				if (controller.expendable) {
+					traders = new List<GameObject> (GameObject.FindGameObjectsWithTag ("Trader"));
+					traderScripts = new Trader[traders.Count];
+					for (int t = 0; t<traders.Count; t++)
+						traderScripts [t] = traders [t].GetComponent<Trader> ();
+				}
+				EditorGUILayout.LabelField ("Trader count", "" + traderCount);
+				EditorGUI.indentLevel = 1;
+				
+				EditorGUILayout.BeginHorizontal ();
+				GUILayout.FlexibleSpace ();
+				EditorGUILayout.BeginVertical ();
+				
+				EditorStyles.label.alignment = TextAnchor.MiddleCenter;
+				EditorStyles.label.fontStyle = FontStyle.Bold;
+				EditorGUILayout.BeginHorizontal ();
+				
+				EditorGUILayout.PrefixLabel ("Trader name");
+				EditorGUILayout.PrefixLabel ("Current target");
+				EditorGUILayout.PrefixLabel ("Final post");
+				EditorGUILayout.EndHorizontal ();
+				EditorStyles.label.fontStyle = FontStyle.Normal;
+				
+				
+				traderCount = 0;
+				for (int t = 0; t<traderScripts.Length; t++) {
+					if (traders [t].activeInHierarchy && traderScripts [t].expendable == controller.expendable) {
+						traderCount++;
+						EditorGUILayout.BeginHorizontal ();
+						EditorGUILayout.PrefixLabel (traderScripts [t].name);
+						if (traderScripts [t].target != null)
+							EditorGUILayout.PrefixLabel (traderScripts [t].target.name);
+						else
+							EditorGUILayout.PrefixLabel (" - ");
+						if (traderScripts [t].finalPost != null)
+							EditorGUILayout.PrefixLabel (traderScripts [t].finalPost.name);
+						else
+							EditorGUILayout.PrefixLabel (" - ");
+						EditorGUILayout.EndHorizontal ();
+					}
+				}
+				EditorGUILayout.EndVertical ();
+				GUILayout.FlexibleSpace ();
+				EditorGUILayout.EndHorizontal ();
+				EditorGUILayout.EndVertical ();
+				EditorStyles.label.alignment = TextAnchor.UpperLeft;
+			}
+			#endregion
+			break;
+			#endregion
+		default:
+			controller.selC = 3;
+			break;
+		}//end switch
 		#region GUI changed
 		if (GUI.changed) {//get changes so can update other scripts
 			for (int p = 0; p<posts.Length; p++) {
@@ -813,15 +1101,16 @@ public class ControllerEditor : Editor
 			EditorUtility.SetDirty (controller);
 		}//end if GUI changed
 		#endregion	
-	}
+	}//end OnInspectorGUI
 	
-	void CheckManufacturingLists(int p){
-		TradePost post = postScripts[p];
+	void CheckManufacturingLists (int p)
+	{
+		TradePost post = postScripts [p];
 		while (post.manufacture.Count != controller.manufacturing.Count) {
 			if (post.manufacture.Count > controller.manufacturing.Count)
 				post.manufacture.RemoveAt (post.manufacture.Count - 1);
 			else
-				post.manufacture.Add (new Mnfctr{allow = false, seconds = 1});
+				post.manufacture.Add (new Mnfctr{allow = false, create = 1, cooldown = 0});
 		}//end while not correct number of manufacturing
 	}
 
@@ -951,5 +1240,26 @@ public class ControllerEditor : Editor
 				}//end 2nd post
 			}//end 1st post
 		}//end show routes
+	}
+	
+	bool ProgressBar ()
+	{
+		controller.traderPrefabs.Clear ();	
+		reloading = true;
+		bool cancelled = false;
+		for (int d = 0; d<directories.Length; d++) {
+			if (EditorUtility.DisplayCancelableProgressBar ("Reloading", "Reloading trader prefabs", d / (directories.Length * 1f))) {
+				cancelled = true;
+				break;
+			}
+			GameObject asset = (GameObject)AssetDatabase.LoadAssetAtPath (directories [d], typeof(GameObject));
+			if (asset != null && asset.tag == "Trader") {
+				traders.Add (asset);
+				controller.traderPrefabs.Add (asset);
+			} 
+		}
+		EditorUtility.ClearProgressBar ();
+		reloading = false;
+		return !cancelled;
 	}
 }

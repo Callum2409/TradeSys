@@ -16,7 +16,9 @@ public class Stock
 public class Mnfctr
 {
 	public bool allow;
-	public int seconds;
+	public int create;
+	public int cooldown;
+	internal bool creating;
 }
 
 public class TradePost : MonoBehaviour
@@ -24,7 +26,6 @@ public class TradePost : MonoBehaviour
 	public List<Stock> stock = new List<Stock> ();
 	public List<Mnfctr> manufacture = new List<Mnfctr> ();
 	Controller controller;
-	float[] times;
 	public List<bool> groups = new List<bool> ();
 	public List<bool> factions = new List<bool> ();
 	string text1 = "Please ensure that the ";
@@ -36,9 +37,6 @@ public class TradePost : MonoBehaviour
 	{
 		controller = GameObject.Find ("Controller").GetComponent<Controller> ();
 		UpdatePrice ();
-		times = new float[controller.manufacturing.Count];
-		for (int t = 0; t<times.Length; t++)
-			times [t] = Time.time;
 	}
 	
 	public void UpdatePrice ()
@@ -54,7 +52,7 @@ public class TradePost : MonoBehaviour
 		}
 	}
 	
-	public void NewPost (int[] itemNumbers, int[] manufactureTimes, bool[] groupsAllow, bool[] factionsAllow)
+	public void NewPost (int[] itemNumbers, int[] manufactureCreate, int[] manufactureCooldown, bool[] groupsAllow, bool[] factionsAllow)
 	{//only used if it is a new trading post
 		Start ();
 		if (itemNumbers.Length != controller.goodsArray.Length)
@@ -68,14 +66,16 @@ public class TradePost : MonoBehaviour
 					stock.Add (new Stock{name = controller.goodsArray [g].name, number = 0, allow = false});
 			}
 		}
-		if (manufactureTimes.Length != controller.manufacturing.Count)
+		if (manufactureCreate.Length != controller.manufacturing.Count)
 			Debug.LogError (text1 + "manufacture times" + text2 + "manufacturing process. Set to less than 1 to disable a process.");
+		else if (manufactureCooldown.Length != controller.manufacturing.Count)
+			Debug.LogError (text1 + "manufacture cooldown" + text2 + "manufacturing process.");
 		else {
-			for (int m = 0; m<manufactureTimes.Length; m++) {   
-				if (manufactureTimes [m] > 0)
-					manufacture.Add (new Mnfctr{allow = true, seconds = manufactureTimes [m]});
+			for (int m = 0; m<manufactureCreate.Length; m++) {   
+				if (manufactureCreate [m] > 0)
+					manufacture.Add (new Mnfctr{allow = true, create = manufactureCreate [m], cooldown = manufactureCooldown [m]});
 				else
-					manufacture.Add (new Mnfctr{allow = false, seconds = 1});
+					manufacture.Add (new Mnfctr{allow = false, create = 1, cooldown = manufactureCooldown [m]});
 			}
 		}
 		if (groupsAllow.Length != controller.groups.Count)
@@ -97,15 +97,21 @@ public class TradePost : MonoBehaviour
 	
 	void Update ()
 	{
-		for (int t = 0; t<times.Length; t++) {
-			if (manufacture [t].allow && Time.time >= times [t] + manufacture [t].seconds && Check (t)) {
-				times [t] = Time.time;
-				
-				AddRemove (controller.manufacturing [t].needing, true);
-				AddRemove (controller.manufacturing [t].making, false);
-				UpdatePrice ();
+		for (int m = 0; m<manufacture.Count; m++) {
+			if (manufacture[m].allow && !manufacture [m].creating && Check (m)) {
+				StartCoroutine (Create (m));
 			}
-		}	
+		}
+	}
+	
+	IEnumerator Create (int manID)
+	{
+		manufacture [manID].creating = true;
+		AddRemove (controller.manufacturing [manID].needing, true);
+		yield return new WaitForSeconds(manufacture [manID].create);
+		AddRemove (controller.manufacturing [manID].making, false);
+		yield return new WaitForSeconds(manufacture [manID].cooldown);
+		manufacture [manID].creating = false;
 	}
 	
 	bool Check (int number)
@@ -169,13 +175,14 @@ public class TradePost : MonoBehaviour
 		}
 	}
 	
-	public void ManufactureEnableDisable (bool enable, int manufactureID, int time)
+	public void ManufactureEnableDisable (bool enable, int manufactureID, int createTime, int coolTime)
 	{
 		if (manufactureID > controller.manufacturing.Count - 1 || manufactureID < 0)
-			Debug.LogError ("The manufactureID"+text3+"manufactureing processes"+text4+"manufactureID is correct.");
+			Debug.LogError ("The manufactureID" + text3 + "manufactureing processes" + text4 + "manufactureID is correct.");
 		else {		
 			manufacture [manufactureID].allow = enable;
-			manufacture [manufactureID].seconds = time;
+			manufacture [manufactureID].create = createTime;
+			manufacture [manufactureID].cooldown = coolTime;
 		}
 	}
 }

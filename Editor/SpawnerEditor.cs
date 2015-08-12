@@ -29,14 +29,27 @@ public class SpawnerEditor : Editor
 		
 		EditorGUILayout.BeginHorizontal ();
 		spawner.maxNo = Mathf.Max (EditorGUILayout.IntField (new GUIContent ("Max total", "This is the maximum number of items that can be in the sphere at any time"), spawner.maxNo), 1);
-		EditorGUILayout.LabelField ("", "");
+		EditorGUILayout.LabelField ("");
 		EditorGUILayout.EndHorizontal ();
 		
 		EditorGUILayout.BeginHorizontal ();
-		spawner.sphereRadius = EditorGUILayout.FloatField (new GUIContent ("Sphere Radius", "Items will be spawned within the radius of this sphere"), spawner.sphereRadius);
-		EditorGUILayout.LabelField ("", "");
+		spawner.option = EditorGUILayout.Popup ("Spawn area", spawner.option, spawner.options, "DropDownButton");
+		
+		string rd = "";
+		if (spawner.option == 0 || spawner.option == 2)
+			rd = " radius";
+		else
+			rd = " width";
+		
+		spawner.radius = EditorGUILayout.FloatField (new GUIContent (spawner.options [spawner.option] + rd, "Items will be spawned within the radius of this sphere"), spawner.radius);
 		EditorGUILayout.EndHorizontal ();
-		spawner.sphereRadius = Mathf.Max (0, spawner.sphereRadius);
+		
+		spawner.randomRotation = EditorGUILayout.Toggle (new GUIContent ("Random rotation", "If selected, an item will be spawned with a random rotation. If disabled, items will be spawned that lie flat along the axis."), spawner.randomRotation);
+		if (!spawner.randomRotation)
+			spawner.specifiedRotation = EditorGUILayout.Vector3Field ("Rotation", spawner.specifiedRotation);
+
+		
+		spawner.radius = Mathf.Max (0, spawner.radius);
 		EditorGUILayout.EndVertical ();
 		EditorGUILayout.BeginVertical ("HelpBox");
 		spawner.showAllow = EditorGUILayout.Foldout (spawner.showAllow, new GUIContent ("Allow spawn", "Select which items you want to be spawned at this spawner"));
@@ -85,5 +98,27 @@ public class SpawnerEditor : Editor
 			}
 		}
 		EditorGUILayout.EndVertical ();
+		
+		if (GUI.changed)
+			EditorUtility.SetDirty (spawner);
 	}
+	
+	void OnSceneGUI ()
+	{
+		if (spawner.option == 2) {
+			Handles.color = Color.green;
+			Handles.DrawWireDisc (spawner.transform.position, spawner.transform.up, spawner.radius);
+		}
+		if (spawner.option == 0 || spawner.option == 2) {
+			if (!spawner.randomRotation) {
+				Handles.color = new Color (1, 0, 0, .3f);
+				Handles.matrix = Matrix4x4.TRS (spawner.transform.position, spawner.transform.rotation * Quaternion.Euler (spawner.specifiedRotation), spawner.transform.lossyScale);
+				Handles.DrawSolidDisc (Vector3.zero, Vector3.up, spawner.radius/2);
+				Handles.color = Color.red;
+				Handles.DrawWireDisc (Vector3.zero, Vector3.up, spawner.radius / 2);
+			}
+		}
+	}
+	
+	
 }
