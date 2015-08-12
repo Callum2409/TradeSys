@@ -32,7 +32,6 @@ namespace TradeSys
 				void Awake ()
 				{
 						controller = GameObject.FindGameObjectWithTag (Tags.C).GetComponent<Controller> ();
-						controller.SortTradePost (this);//make sure that the trade post has all of the correct information
 						for (int m1 = 0; m1<manufacture.Count; m1++) {//for all manufacture groups
 								for (int m2 = 0; m2<manufacture[m1].manufacture.Count; m2++) {//for all manufacture processes
 										if (manufacture [m1].manufacture [m2].enabled)

@@ -214,7 +214,7 @@ namespace TradeSys
 			
 						for (int n = 0; n<currentNM.Count; n++) {//go through all needing or making
 								current = currentNM [n];
-								tooltip += current.number + "×";
+								tooltip += current.number + "\u00D7";
 								if (current.itemID >= 0)//check item is not undefined
 										tooltip += controller.allNames [current.groupID] [current.itemID] + ", ";//get the groupID and itemID to get the name
 								else
@@ -497,5 +497,50 @@ namespace TradeSys
 										return true;
 						return false;
 				}//end AnyManufacturing
+				
+				public Vector2 EnableDisableItems (string title, string exp, Vector2 scrollPos, SerializedObject controllerSO, SerializedProperty item, SerializedProperty smallScroll, Controller controllerNormal)
+				{//the option GUI used for traders and spawners
+						SerializedProperty controllerGoods = controllerSO.FindProperty ("goods");
+				
+						EditorGUI.indentLevel = 0;
+						EditorGUILayout.BeginHorizontal ();
+						EditorGUILayout.LabelField (title, EditorStyles.boldLabel);
+						GUILayout.FlexibleSpace ();
+						ExpandCollapse (controllerGoods, exp, false);
+						EditorGUILayout.EndHorizontal ();
+			
+						HorizVertOptions (controllerSO.FindProperty ("showHoriz"));//show display options
+			
+						scrollPos = StartScroll (scrollPos, smallScroll);
+			
+						if (AnyGoods (item, "items")) {
+								EditorGUILayout.LabelField ("", "", "PopupCurveSwatchBackground", GUILayout.MaxHeight (0f));
+				
+								for (int g = 0; g<controllerNormal.goods.Count; g++) {
+										SerializedProperty itemGroup = item.GetArrayElementAtIndex (g).FindPropertyRelative ("items");
+										if (itemGroup.arraySize > 0) {//dont show anything if nothing in group
+												EditorGUI.indentLevel = 0;
+						
+												SerializedProperty currentGroup = controllerGoods.GetArrayElementAtIndex (g);
+												SerializedProperty expanded = currentGroup.FindPropertyRelative (exp);
+						
+												if (expanded.boolValue)
+														EditorGUILayout.BeginHorizontal ();
+						
+												if (TitleButton (new GUIContent (currentGroup.FindPropertyRelative ("name").stringValue), expanded, "BoldLabel")) {//if foldout for goods group open											
+							
+														EnableDisable (itemGroup, "enabled", true);
+							
+														HorizVertDisplay (controllerNormal.allNames [g], itemGroup, "enabled", controllerSO.FindProperty ("showHoriz").boolValue, 1, true);
+												}//end if group open
+												EditorGUI.indentLevel = 0;
+												EditorGUILayout.LabelField ("", "", "PopupCurveSwatchBackground", GUILayout.MaxHeight (0f));
+										}//end if something in group
+								}//end for all groups
+						} else//end if something to show
+								EditorGUILayout.HelpBox ("No goods have been added. Add goods in the controller first.", MessageType.Info);
+				
+						return scrollPos;//need to return this so that scrolling work
+				}//end EnableDisableGoods
 		}//end TSGUI
 }//end namespace

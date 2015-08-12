@@ -2,7 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 
-public class Player : MonoBehaviour
+public class TSPlayer : MonoBehaviour
 {
 /*
 This script is example code for the use of TradeSys in your game. It is intended to show you how to get the different useful variables out of

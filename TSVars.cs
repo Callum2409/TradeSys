@@ -23,6 +23,7 @@ namespace TradeSys
 			C, //controller
 			P, //trade post
 			T,//trader
+			S,//spawner
 			GG, //goods group
 			MG;//manufacture group
 	}
@@ -34,14 +35,16 @@ namespace TradeSys
 						S, //controller settings
 						G, //controller goods
 						M, //controller manufacturing
+						GG, //goods group (horiz)
+						MG,//manufacture group (horiz)
 						PS, //post settings
 						PG, //post goods
 						PM, //post manufacturing
 						TS, //trader settings
 						TG, //trader goods
 						TM, //trader manufacturing
-						GG, //goods group (horiz)
-						MG;//manufacture group (horiz
+						SS, //spawner settings
+						SG; //spawner goods						
 		}
 	#endif
 
@@ -67,7 +70,7 @@ namespace TradeSys
 		{//the groups of goods
 				public string name;
 				public List<Goods> goods = new List<Goods> ();
-				public bool expandedP, expandedT;
+				public bool expandedP, expandedT, expandedS;
 		}
 
 		[System.Serializable]
@@ -197,13 +200,13 @@ namespace TradeSys
 		}
 
 		[System.Serializable]
-		public class Item : IComparable<Item>
+		public class ItemCargo : IComparable<ItemCargo>
 		{//the allow items for traders
 				public string name;
 				public bool enabled;
 				public int number;
 	
-				public int CompareTo (Item other)
+				public int CompareTo (ItemCargo other)
 				{
 						return name.CompareTo (other.name);
 				}
@@ -212,7 +215,7 @@ namespace TradeSys
 		[System.Serializable]
 		public class ItemGroup
 		{//have the allow items in groups
-				public List<Item> items = new List<Item> ();
+				public List<ItemCargo> items = new List<ItemCargo> ();
 		}
 
 		[System.Serializable]

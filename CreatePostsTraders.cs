@@ -25,6 +25,7 @@ namespace TradeSys {//use namespace to stop any name conflicts
 				newPost.transform.position = Random.insideUnitSphere * sphereRadius;//set the position
 				newPost.transform.parent = GameObject.Find ("Posts").transform;//set the parent, so doesnt fill hierarchy
 				newPost.name = "Trade Post " + (n + 1);//set the name so is easier to find any later
+				controller.SortTradePost(newPost);//sort the new post information
 			
 				for (int g = 0; g<controller.goods.Count; g++) {//go through all groups
 					for (int s = 0; s<controller.goods[g].goods.Count; s++)//go through all goods
@@ -60,6 +61,7 @@ namespace TradeSys {//use namespace to stop any name conflicts
 			#region traders
 			for (int n = 0; n<numberOfTraders; n++) {//add new traders, setting them up
 				Trader newTrader = GameObject.CreatePrimitive (PrimitiveType.Cube).AddComponent<Trader> ();//create the cube
+				newTrader.gameObject.AddComponent<TSTraderAI>();//add the trader AI
 				newTrader.tag = Tags.T;//set the tag so the controller can see it
 				int random = Random.Range (0, controller.tradePosts.Length);//select the starting trade post from all of the trade posts
 				GameObject targetPost = controller.tradePosts [random];//set the start post
@@ -82,7 +84,7 @@ namespace TradeSys {//use namespace to stop any name conflicts
 				}//end if groups enabled
 			}//end for new traders
 			#endregion
-			
+
 			controller.GenerateDistances ();//added all the posts and traders, now needs to get distances
 			//without the line above, TradeSys will not do anything!
 			

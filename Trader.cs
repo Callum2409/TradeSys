@@ -14,12 +14,12 @@ namespace TradeSys
 				public int postID;//the ID of the current post
 				public bool onCall;//true if the trader has been given a destination post
 				public bool allowGo = false;//whether the trader is allowed to move or not
+				public bool allowCollect;//whether the trader is allowed to collect dropped items
 				public int cash = 1000;//the amount of money that the trader has to buy items with
 				public double cargoSpace = 10, spaceRemaining;//the cargo space of the trader, and how much is left
 				public float closeDistance = 1.5f;//how far away the trader needs to be from the trade post before it registers as being there
 				public float stopTime;//how long the trader needs to stop for
-				public float radarDistance;//how far away can the trader see dropped items
-//	public float droneTime;	
+				public float radarDistance;//how far away can the trader see dropped items	
 				public List<ItemGroup> items = new List<ItemGroup> ();//a list where it is possible to select what a trader can and can't carry
 				public List<bool> factions = new List<bool> ();//select which factions the trader belongs to
 				public List<MnfctrGroup> manufacture = new List<MnfctrGroup> ();//manufacturing lists
@@ -27,22 +27,10 @@ namespace TradeSys
 				void Awake ()
 				{
 						controller = GameObject.FindGameObjectWithTag (Tags.C).GetComponent<Controller> ();
-						controller.SortTrader (this);
 						spaceRemaining = cargoSpace;//set the space remaining to be the same as the cargo space, because have no cargo
 				}//end Awake
 	
-				void Update ()
-				{			
-						if (onCall && allowGo) {//check is able to go
-								this.transform.LookAt (target.transform.position);
-								this.transform.Translate (Vector3.forward * Time.timeScale * .05f);
-			
-								if (Vector3.Distance (this.transform.position, target.transform.position) <= closeDistance) //if close enough
-										StartCoroutine (AtPost ());//call the AtPost method, so will unload the cargo
-						}//end if able to go
-				}//end Update
-	
-				IEnumerator AtPost ()
+				public IEnumerator AtPost ()
 				{//called when the trader has reached the post, so needs to sell items
 						allowGo = false; 
 						float totalTime = 0;//the number of items that were transferred

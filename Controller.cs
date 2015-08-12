@@ -15,7 +15,8 @@ namespace TradeSys
 				public ScrollPos scrollPos = new ScrollPos();//the scroll positions
 				public bool showHoriz;//show a list of items horizontally or vertically
 				public bool genOp, gamOp, traOp, pauOp;//the bools for if each option is showing in the controller
-				public bool opTP, opT;//the bools for if the options are showing for trade posts or traders
+				public bool opTP, opT;//the bools for if the options are showing for trade posts and traders
+				public bool sTi, sNo, sSh;//bools for options and shape for spawners
 				public string[][] allNames;//an array for each group with an array of the names
 				public string[][] manufactureNames;//an array with the names of each manufacturing process
 				public string[][] manufactureTooltips;//an array of strings with the tooltip for the manufacturng processes
@@ -28,6 +29,8 @@ namespace TradeSys
 				public bool showLinks = false;//show possible trade links
 	
 				public bool generateAtStart = true;//if this is true, then generate distances at start. Disable if posts generated in code
+				public bool pickUp = false;//whether you can collect items or not. Enabling allows setting of itemCrates
+				public GameObject defaultCrate;//the default crate used if a crate has not been specified
 	
 				public int closestPosts = 10;//this is the number of closest posts that should be taken into account
 				public float distanceWeight = 1;//the weighting of the distance to find the best post
@@ -50,6 +53,8 @@ namespace TradeSys
 	
 				public GameObject[] traders;//all of the traders in the game
 				public Trader[] traderScripts;//all of the scripts of the traders
+				
+				public Spawner[] spawners;//all of the spawner scripts in the game
 	
 				public EnableList postTags;//all of the tags that can be selected by a trade post
 				public EnableList groups;//the different groups that a trade post can be in
@@ -72,13 +77,24 @@ namespace TradeSys
 				//			System.Diagnostics.Stopwatch stoppy = new System.Diagnostics.Stopwatch ();
 
 				void Start ()
-				{//at the start, the only thing that can be checked is to see if generate has been selected
+				{				
+						//at the start, the only thing that can be checked is to see if generate has been selected
 						//if is has been selected, then generate and the rest can continue, but if not, then needs to wait to be called
 						//this is done once all of the trade posts have been set up from your code.	
 						if (generateAtStart)//generate the distances if the trade posts have been set up
 								GenerateDistances ();
+								
 						if (showLinesInGame)//if set debug bool to show lines in the game view
 								DrawLines ();
+								
+						if (pickUp && defaultCrate != null) {//if it is possible to pick up items
+								for (int g = 0; g<goods.Count; g++) {//for all goods groups
+										for (int i = 0; i<goods[g].goods.Count; i++) {//for all items
+												if (goods [g].goods [i].itemCrate == null)
+														goods [g].goods [i].itemCrate = defaultCrate;//set the item crate to be the default
+										}//end for all items
+								}//end for goods groups
+						}//end if need to sort crates
 				}//end Start
 				
 				float CalcDistance (GameObject tp1, GameObject tp2)
@@ -91,16 +107,12 @@ namespace TradeSys
 				public void GenerateDistances ()
 				{//At the start, needs to generate all of the distances and the closest posts for use later. As this is called first, will call all other methods
 						//generate the distances so that dont need to call sqrMagnitude each time, instead it can just be referenced from the array
-						traders = GameObject.FindGameObjectsWithTag (Tags.T);
-						traderCount = traders.Length;
+						SortAll ();//needs to make sure that everything is sorted properly before starting
 		
-						GetPostScripts ();//get all of the trade posts and their scripts
 						//initialise arrays
 						postDistances = new float[tradePostCount][];
 						closest = new Distances[tradePostCount][];
 						tradeLists = new Trade[tradePostCount];
-		
-						traderScripts = new Trader[traderCount];
 		
 						for (int t = 0; t<tradePostCount; t++) {//need to initialise second array before getting distances because will be filling up later elements at same time
 								postDistances [t] = new float[tradePostCount];
@@ -108,8 +120,7 @@ namespace TradeSys
 						}//end for initialisation distances and trade lists
 		
 						for (int t = 0; t<traderCount; t++) {//need to add all of the trader scripts, and get the starting postID
-								Trader trader = traders [t].GetComponent<Trader> ();
-								traderScripts [t] = trader;
+								Trader trader = traderScripts [t];
 								int postID = GetPostID (trader.target);
 								trader.postID = postID;
 								trader.startPost = trader.finalPost = postScripts [postID];
@@ -132,11 +143,12 @@ namespace TradeSys
 
 						//Now needs to call other methods
 						Average ();
-						for (int p = 0; p<postScripts.Length; p++)
+						for (int p = 0; p<tradePostCount; p++)
 								postScripts [p].UpdatePrices ();
 						InvokeRepeating ("UpdateMethods", 0, updateInterval);
 				}//end GenerateDistances
 	
+		#region get scripts
 				public void GetPostScripts ()
 				{//get all of the trade posts and get the scripts
 						tradePosts = GameObject.FindGameObjectsWithTag (Tags.TP);//get all of the trade posts
@@ -146,6 +158,17 @@ namespace TradeSys
 						for (int t = 0; t<tradePostCount; t++) //go through trade posts getting script
 								postScripts [t] = tradePosts [t].GetComponent<TradePost> ();
 				}//end GetPostScripts
+				
+				public void GetTraderScripts ()
+				{//get all of the traders and get the scripts
+						traders = GameObject.FindGameObjectsWithTag (Tags.T);//get all of the traders
+						traderCount = traders.Length;//set the post count to the length
+						traderScripts = new Trader[traderCount];
+			
+						for (int t = 0; t<traderCount; t++) //go through traders getting script
+								traderScripts [t] = traders [t].GetComponent<Trader> ();
+				}//end GetTraderScripts
+		#endregion
 	
 				public void GetClosest ()
 				{//get the closest posts from the distance array
@@ -253,7 +276,7 @@ namespace TradeSys
 								for (int i = 0; i<goods[g].goods.Count; i++) {//go through all items
 										int count = 0;//the number of trade posts it is enabled at
 										int total = 0;//the number of items available
-										for (int p = 0; p<postScripts.Length; p++) {//go through all posts
+										for (int p = 0; p<tradePostCount; p++) {//go through all posts
 												Stock current = postScripts [p].stock [g].stock [i];
 												if ((current.buy || current.sell) && postScripts [p].allowTrades) {//if is enabled at the post and trade post allowed to trade
 														count++;//increase the post count
@@ -292,14 +315,18 @@ namespace TradeSys
 				
 				public void SortAll ()
 				{//sort out all trade posts and traders
+						GetPostScripts ();
+						GetTraderScripts ();
+				
 						SortTradePosts ();
 						SortTraders ();
+						SortSpawners ();
 						ManufactureMass ();
 				}//end SortAll
 	
 				public void SortTradePosts ()
 				{//make sure that all trade posts have the required settings
-						for (int t = 0; t<postScripts.Length; t++)//go throuh all trade posts, sorting out the requried settings
+						for (int t = 0; t<tradePostCount; t++)//go throuh all trade posts, sorting out the requried settings
 								SortTradePost (postScripts [t]);
 				}//end SortTradePosts
 	
@@ -365,7 +392,7 @@ namespace TradeSys
 	
 				public void SortTraders ()
 				{//make sure that all of the traders have the required settings
-						for (int t = 0; t<traderScripts.Length; t++)
+						for (int t = 0; t<traderCount; t++)
 								SortTrader (traderScripts [t]);
 				}//end SortTraders
 	
@@ -380,7 +407,7 @@ namespace TradeSys
 		
 						for (int a = 0; a<thisTrader.items.Count; a++) {//for each group
 								while (thisTrader.items[a].items.Count < goods[a].goods.Count)//while not enough goods
-										thisTrader.items [a].items.Add (new Item{ enabled = true});
+										thisTrader.items [a].items.Add (new ItemCargo{ enabled = true});
 								if (thisTrader.items [a].items.Count > goods [a].goods.Count) //if too many, remove extra
 										thisTrader.items [a].items.RemoveRange (goods [a].goods.Count, thisTrader.items [a].items.Count - goods [a].goods.Count);
 						}
@@ -411,6 +438,36 @@ namespace TradeSys
 						#endregion
 				}//end SortTrader
 				
+				public void SortSpawners ()
+				{//make sure that all of the spawners have the required settings
+						GameObject[] spawnerObjects = GameObject.FindGameObjectsWithTag (Tags.S);
+						spawners = new Spawner[spawnerObjects.Length];
+						
+						if (spawnerObjects.Length > 0)//if spawners are in game, needs to be set to true
+								pickUp = true;
+				
+						for (int s = 0; s<spawnerObjects.Length; s++) {//go through spawner objects, getting the scripts and sorting
+								spawners [s] = spawnerObjects [s].GetComponent<Spawner> ();
+								SortSpawner (spawners [s]);
+						}//end for all spawners
+				}//end SortSpawners
+		
+				public void SortSpawner (Spawner thisSpawner)
+				{//sort out the spawner so shows correct items
+						while (thisSpawner.items.Count < goods.Count)//while not enough groups
+								thisSpawner.items.Add (new ItemGroup{});
+						if (thisSpawner.items.Count > goods.Count)//if too many, remove extra
+								thisSpawner.items.RemoveRange (goods.Count, thisSpawner.items.Count - goods.Count);
+						//should now have the correct number of groups
+			
+						for (int a = 0; a<thisSpawner.items.Count; a++) {//for each group
+								while (thisSpawner.items[a].items.Count < goods[a].goods.Count)//while not enough goods
+										thisSpawner.items [a].items.Add (new ItemCargo{ enabled = true});
+								if (thisSpawner.items [a].items.Count > goods [a].goods.Count) //if too many, remove extra
+										thisSpawner.items [a].items.RemoveRange (goods [a].goods.Count, thisSpawner.items [a].items.Count - goods [a].goods.Count);
+						}
+				}//end SortSpawner
+			
 				public void ManufactureMass ()
 				{//go through manufacture processes and calculate the needing and making masses
 						for (int m = 0; m<manufacture.Count; m++) {//go through groups
@@ -430,7 +487,8 @@ namespace TradeSys
 						NeedMake cItem = new NeedMake ();
 						for (int nm = 0; nm<cNM.Count; nm++) {//go through list
 								cItem = cNM [nm];
-								mass += goods [cItem.groupID].goods [cItem.itemID].mass * cItem.number;//add to total mass
+								if (cItem.groupID != -1 && cItem.itemID != -1)
+										mass += goods [cItem.groupID].goods [cItem.itemID].mass * cItem.number;//add to total mass
 						}//end for list
 						return mass;
 				}//end ManufactureMass
@@ -653,8 +711,8 @@ namespace TradeSys
 				void DrawLines ()
 				{//draw lines showing the possible trade links. Is here so that lines can also be drawn in the game view
 						GetPostScripts ();
-						for (int p1 = 0; p1<postScripts.Length; p1++) {//go through trade posts
-								for (int p2 = p1+1; p2<postScripts.Length; p2++) {//go through possible connection posts
+						for (int p1 = 0; p1<tradePostCount; p1++) {//go through trade posts
+								for (int p2 = p1+1; p2<tradePostCount; p2++) {//go through possible connection posts
 										if (CheckFactionsGroups (postScripts [p1], postScripts [p2])) {//check in the same faction / group
 												if (!factions.enabled) {//if factions not enabled, then only green lines
 														if (Application.isPlaying && showLinesInGame) {//if is playing, use line renderer

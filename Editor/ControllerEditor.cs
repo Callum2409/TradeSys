@@ -1,4 +1,4 @@
-﻿#if UNITY_4_0 || UNITY_4_1 || UNITY_4_2
+#if UNITY_4_0 || UNITY_4_1 || UNITY_4_2
 #define API
 #endif
 using UnityEngine;
@@ -48,9 +48,11 @@ namespace TradeSys
 				private Controller controllerNormal;
 				private SerializedObject[] postScripts;
 				private SerializedObject[] traderScripts;
+				private SerializedObject[] spawnerScripts;
 				private SerializedProperty showLinks;
 				private SerializedProperty updateInterval;
 				private SerializedProperty generateAtStart;
+				private SerializedProperty pickUp, defaultCrate;
 				private SerializedProperty pauseOption, pauseTime, pauseEnter, pauseExit;
 				private SerializedProperty goods;
 				private SerializedProperty manufacture;
@@ -81,6 +83,14 @@ namespace TradeSys
 								controllerNormal.traderScripts [t] = controllerNormal.traders [t].GetComponent<Trader> ();
 								traderScripts [t] = new SerializedObject (controllerNormal.traderScripts [t]);
 						}
+						
+						GameObject[] spawners = GameObject.FindGameObjectsWithTag (Tags.S);
+						controllerNormal.spawners = new Spawner[spawners.Length];
+						spawnerScripts = new SerializedObject[spawners.Length];
+						for (int s = 0; s<spawners.Length; s++) {
+								controllerNormal.spawners [s] = spawners [s].GetComponent<Spawner> ();
+								spawnerScripts [s] = new SerializedObject (controllerNormal.spawners [s]);
+						}
 		
 						#region get options
 						showGN = controllerSO.FindProperty ("showGN");
@@ -95,6 +105,8 @@ namespace TradeSys
 						updateInterval = controllerSO.FindProperty ("updateInterval");
 		
 						generateAtStart = controllerSO.FindProperty ("generateAtStart");
+						pickUp = controllerSO.FindProperty ("pickUp");
+						defaultCrate = controllerSO.FindProperty ("defaultCrate");
 		
 						pauseOption = controllerSO.FindProperty ("pauseOption");
 						pauseTime = controllerSO.FindProperty ("pauseTime");
@@ -135,10 +147,14 @@ namespace TradeSys
 				
 						for (int t = 0; t<traderScripts.Length; t++)
 								traderScripts [t].Update ();
+								
+						for (int s = 0; s<spawnerScripts.Length; s++)
+								spawnerScripts [s].Update ();
 		
 						#region get goods names
 						List<string> allNames = new List<string> ();//a list of all the names of goods to be shown in manufacturing, not in groups
 						int[] groupLengthsG = new int[goods.arraySize];//contains the length of each group, so can convert between int and groupID and itemID
+						
 						controllerNormal.allNames = new string[controllerNormal.goods.Count][];//an array of names of goods in groups
 			
 						for (int g1 = 0; g1<goods.arraySize; g1++) {//go through all groups
@@ -207,7 +223,21 @@ namespace TradeSys
 												updateInterval.floatValue = 0.02f;
 										EditorGUILayout.EndHorizontal ();
 			
+										EditorGUILayout.BeginHorizontal ();
 										EditorGUILayout.PropertyField (generateAtStart, new GUIContent ("Generate at start", "If the trade posts have been set, enable this. If they are being added through code, then disable. Call the GenerateDistances method in the controller once they have been added."));
+										EditorGUILayout.PropertyField (pickUp, new GUIContent ("Allow pickup", "Allow the collection of items found. If enabled, allows item crates to be set."));
+										
+										if (GameObject.FindGameObjectsWithTag (Tags.S).Length > 0)//if there are spawners, this needs to be true
+												pickUp.boolValue = true;
+										
+										EditorGUILayout.EndHorizontal ();
+
+										if (pickUp.boolValue) {//only show default crate option if pickup has been enabled
+												EditorGUILayout.PropertyField (defaultCrate, new GUIContent ("Default crate", "If an item crate has not been set, use this crate instead"));
+								
+												if (defaultCrate.objectReferenceValue != null)
+														SortCrate (defaultCrate);
+										}//end if pickup enabled
 								} //end if showing game options
 								EditorGUILayout.EndVertical ();
 					#endregion
@@ -486,6 +516,33 @@ namespace TradeSys
 								if (GUILayout.Button (new GUIContent ("Sort", "Sort the goods by name alphabetically"), EditorStyles.miniButtonLeft, GUILayout.MinWidth (45f)))
 										SortLists (selGG.intValue);
 								GUI.enabled = true;
+								
+								if (GUILayout.Button (new GUIContent ("Find crates", "Find the crates for all goods in this group"), EditorStyles.miniButtonMid)) {//if button pressed	
+										bool notFound = false;
+										
+										for (int g = 0; g<currentGoodsGroup.arraySize; g++) {//for all goods
+						
+												if (EditorUtility.DisplayCancelableProgressBar ("Finding", "Finding crates", g / currentGoodsGroup.arraySize)) {
+														EditorUtility.ClearProgressBar ();
+														return;
+												}
+												
+												SerializedProperty cG = currentGoodsGroup.GetArrayElementAtIndex (g);//get the current good
+												SerializedProperty cGC = cG.FindPropertyRelative ("itemCrate");
+												
+												cGC.objectReferenceValue = (GameObject)Resources.Load (goodName.stringValue + "/" + namesG [selGG.intValue], typeof(GameObject));
+					
+												if (cGC.objectReferenceValue == null)
+														notFound = true;
+												else//else sort the crate
+														SortCrate (cGC);
+										}//end for all goods
+										EditorUtility.ClearProgressBar ();
+					
+										if (notFound)
+												Debug.LogError ("Item crate could not be found for one or more goods.\nMake sure that the name of the GameObject is the same and is placed in Resources/" + namesG [selGG.intValue]);
+								}//end if find all crates pressed								
+								
 								GUITools.ExpandCollapse (currentGoodsGroup, "expanded", true);
 								EditorGUILayout.EndHorizontal ();
 			
@@ -518,7 +575,7 @@ namespace TradeSys
 										EditorGUILayout.BeginVertical ();//vertical to make the set of buttons central vertically
 										GUILayout.Space (1f);//the space
 										EditorGUILayout.BeginHorizontal ();//now needs a horizontal so all the buttons dont follow the vertical
-										if (GUILayout.Button (new GUIContent ("▲", "Move up"), EditorStyles.miniButtonLeft)) {
+										if (GUILayout.Button (new GUIContent ("\u25B2", "Move up"), EditorStyles.miniButtonLeft)) {
 												currentGoodsGroup.MoveArrayElement (g, g - 1);
 												MoveFromPoint (g - 1, selGG.intValue, true);
 												ListShuffle (true, g, g - 1, selGG.intValue);
@@ -565,7 +622,7 @@ namespace TradeSys
 												break;
 										}
 										GUI.enabled = g < currentGoodsGroup.arraySize - 1 && !Application.isPlaying;//disable if already at the bottom
-										if (GUILayout.Button (new GUIContent ("▼", "Move down"), EditorStyles.miniButtonRight)) {
+										if (GUILayout.Button (new GUIContent ("\u25BC", "Move down"), EditorStyles.miniButtonRight)) {
 												currentGoodsGroup.MoveArrayElement (g, g + 1);
 												MoveFromPoint (g + 1, selGG.intValue, false);
 												ListShuffle (true, g, g + 1, selGG.intValue);
@@ -604,6 +661,28 @@ namespace TradeSys
 														if (currentGood.FindPropertyRelative ("pausePerUnit").floatValue < 0)
 																currentGood.FindPropertyRelative ("pausePerUnit").floatValue = 0;
 												}//end pause time
+					
+												if (pickUp.boolValue) {//only show these options if it is possible to collect items
+														EditorGUILayout.BeginHorizontal ();
+														SerializedProperty itemCrate = currentGood.FindPropertyRelative ("itemCrate");
+														
+														if (itemCrate.objectReferenceValue == null)
+																GUI.color = Color.red;//make red if null
+														
+														EditorGUILayout.PropertyField (itemCrate, new GUIContent ("Item crate", "This is what the item looks like when you see it in the game, so is likely to be in a box or crate"));//item crate field
+														GUI.color = Color.white;
+														
+														if (GUILayout.Button (new GUIContent ("Find crate", "If the item has the same name as the crate and is in Resources/" + namesG [selGG.intValue] + ", press this to find it"), EditorStyles.miniButton, GUILayout.MaxWidth (75f))) {//find crate button for quick finding
+																
+																itemCrate.objectReferenceValue = (GameObject)Resources.Load (goodName.stringValue + "/" + name.stringValue, typeof(GameObject));
+																
+																if (itemCrate.objectReferenceValue == null)
+																		Debug.LogError ("Item crate could not be found.\nMake sure that the name of the GameObject is the same and is placed in Resources/" + namesG [selGG.intValue]);
+																else//else make sure has Item component and tag
+																		SortCrate (itemCrate);//sort out the item crate
+														}//end if find crate pressed
+														EditorGUILayout.EndHorizontal ();
+												}
 					
 												EditorGUILayout.LabelField ("Prices", EditorStyles.boldLabel);//bold prices label for sub section
 												EditorGUI.indentLevel = 2;
@@ -654,6 +733,8 @@ namespace TradeSys
 								EditorGUI.indentLevel = 0;
 								int[] groupLengthsM = new int[manufacture.arraySize];//a running total of the number of processes
 								int manufactureCount = 0;//the total number of manufacturing processes;
+								
+								controllerNormal.ManufactureMass ();
 			
 								SerializedProperty selMG = controllerSO.FindProperty ("selected").FindPropertyRelative ("MG");
 			
@@ -685,8 +766,7 @@ namespace TradeSys
 								if (selMG.intValue != selMB)
 										GUIUtility.keyboardControl = 0;
 										
-								EditorGUILayout.EndScrollView ();										
-			
+								EditorGUILayout.EndScrollView ();		
 			
 								GUILayout.Space (3f);
 								if (GUITools.PlusMinus (true) || manufacture.arraySize == 0) //if add groups pressed
@@ -756,7 +836,7 @@ namespace TradeSys
 										EditorGUILayout.BeginVertical ();//vertical to make the set of buttons central vertically
 										GUILayout.Space (1f);//the space
 										EditorGUILayout.BeginHorizontal ();//now needs a horizontal so all the buttons dont follow the vertical
-										if (GUILayout.Button (new GUIContent ("▲", "Move up"), EditorStyles.miniButtonLeft)) {
+										if (GUILayout.Button (new GUIContent ("\u25B2", "Move up"), EditorStyles.miniButtonLeft)) {
 												currentManGroup.MoveArrayElement (m, m - 1);
 												ListShuffle (false, m, m - 1, selMG.intValue);
 										}
@@ -783,7 +863,7 @@ namespace TradeSys
 												break;
 										}
 										GUI.enabled = m < currentManGroup.arraySize - 1 && !Application.isPlaying;//disable if already at the bottom
-										if (GUILayout.Button (new GUIContent ("▼", "Move down"), EditorStyles.miniButtonRight)) {
+										if (GUILayout.Button (new GUIContent ("\u25BC", "Move down"), EditorStyles.miniButtonRight)) {
 												currentManGroup.MoveArrayElement (m, m + 1);
 												ListShuffle (false, m, m + 1, selMG.intValue);
 										}
@@ -799,8 +879,7 @@ namespace TradeSys
 												EditorGUI.indentLevel = 1;
 												EditorGUILayout.PropertyField (currentManufacture.FindPropertyRelative ("name"), new GUIContent ("Name", "This is the name of the process"));
 
-												controllerNormal.ManufactureMass ();
-												EditorGUILayout.LabelField (new GUIContent (UnitString (currentManufacture.FindPropertyRelative ("needingMass").floatValue, false) + " ► " + UnitString (currentManufacture.FindPropertyRelative ("makingMass").floatValue, false),
+												EditorGUILayout.LabelField (new GUIContent (UnitString (currentManufacture.FindPropertyRelative ("needingMass").floatValue, false) + " \u25B6 " + UnitString (currentManufacture.FindPropertyRelative ("makingMass").floatValue, false),
 						                                            "Shows the mass conversion of the needing and making items"));
 														
 												EditorGUI.indentLevel = 1;
@@ -852,6 +931,8 @@ namespace TradeSys
 								postScripts [p].ApplyModifiedProperties ();
 						for (int t = 0; t<traderScripts.Length; t++)
 								traderScripts [t].ApplyModifiedProperties ();
+						for (int s = 0; s<spawnerScripts.Length; s++)
+								spawnerScripts [s].ApplyModifiedProperties ();
 				}//end OnInspectorGUI
 	
 				///this is to go through the manufacturing lists made, and make sure that each itemID is still pointing to the correct one
@@ -885,13 +966,20 @@ namespace TradeSys
 								groupStock.stock.Sort ();//now sort the items, and will be sorted the same as the other stock list
 						}//end for all posts
 		
-						for (int t = 0; t<controllerNormal.traderScripts.Length; t++) {//go through all traders
-								ItemGroup itemGroup = controllerNormal.traderScripts [t].items [groupNo];//allow group for the trader
-								for (int a = 0; a<itemGroup.items.Count; a++)//go through all allow
-										itemGroup.items [a].name = before [a].name;//and set the name to what it was before sorting
-								itemGroup.items.Sort ();
-						}//end for all traders
+						for (int t = 0; t<controllerNormal.traderScripts.Length; t++)//go through all traders
+								SortLists (controllerNormal.traderScripts [t].items [groupNo], before);
+						
+						for (int s = 0; s<controllerNormal.spawners.Length; s++)//go through all spawners
+								SortLists (controllerNormal.spawners [s].items [groupNo], before);
+				
 				}//end SortLists
+				
+				void SortLists (ItemGroup ig, Goods[] before)
+				{//sorts the items in traders and spawners
+						for (int a = 0; a<ig.items.Count; a++)//go through all allow
+								ig.items [a].name = before [a].name;//and set the name to what it was before sorting
+						ig.items.Sort ();
+				}//end SortLists for traders and spawners
 	
 				///when a good gets moved up or down, the items in manufacturing also need changing
 				///itemNo is the destination array number of the changed
@@ -1087,8 +1175,10 @@ namespace TradeSys
 				///convert from single int to a groupID and an itemID
 				void ConvertFromSelected (SerializedProperty currentNM, int[] lengths, int selected)
 				{
-						if (selected == -1)
+						if (selected == -1) {
 								currentNM.FindPropertyRelative ("itemID").intValue = currentNM.FindPropertyRelative ("groupID").intValue = -1;
+								return;//no need to go through the rest, so return
+						}//end if -1
 				
 						int groupNo = 0;
 						while (selected >= lengths[groupNo]) {
@@ -1130,13 +1220,9 @@ namespace TradeSys
 						}//end for all manufacture groups
 						#endregion
 		
-						#region trade posts
 						GroupRemove (postScripts, "stock", groupNo);
-						#endregion
-		
-						#region traders
 						GroupRemove (traderScripts, "items", groupNo);
-						#endregion
+						GroupRemove (spawnerScripts, "items", groupNo);
 				}//end GroupRemove
 	
 				///goes through all items in option, and removes an element in the property array
@@ -1158,12 +1244,16 @@ namespace TradeSys
 								else
 										postScripts [p].FindProperty ("manufacture").MoveArrayElement (moveFrom, moveTo);
 						}//end for posts
-						for (int t = 0; t<postScripts.Length; t++) {//go through all traders
+						for (int t = 0; t<traderScripts.Length; t++) {//go through all traders
 								if (goods)
 										traderScripts [t].FindProperty ("items").GetArrayElementAtIndex (groupNo).FindPropertyRelative ("items").MoveArrayElement (moveFrom, moveTo);
 								else
 										traderScripts [t].FindProperty ("manufacture").MoveArrayElement (moveFrom, moveTo);
 						}//end for traders
+						if (goods) {//only need to sort spawners if goods moved
+								for (int s = 0; s<spawnerScripts.Length; s++)//go through all spawners
+										spawnerScripts [s].FindProperty ("items").GetArrayElementAtIndex (groupNo).FindPropertyRelative ("items").MoveArrayElement (moveFrom, moveTo);
+						}//end if goods moved
 				}//end ListShuffle
 	
 				///called when a good is added, copied or removed
@@ -1191,14 +1281,9 @@ namespace TradeSys
 								}//else manufacturing
 						}//end for all posts
 						for (int t = 0; t<traderScripts.Length; t++) {//go through all traders
-								if (goods) {//only need to edit traders if it is the goods list being edited
-										SerializedProperty items = traderScripts [t].FindProperty ("items").GetArrayElementAtIndex (groupNo).FindPropertyRelative ("items");
-										if (adding) {
-												items.InsertArrayElementAtIndex (point);
-												items.GetArrayElementAtIndex (point).FindPropertyRelative ("enabled").boolValue = true;
-										} else
-												items.DeleteArrayElementAtIndex (point);
-								} else {//if manufacturing
+								if (goods) 
+										EditLists (traderScripts [t], groupNo, adding, point);
+								else {//if manufacturing
 										SerializedProperty manufacturing = traderScripts [t].FindProperty ("manufacture").GetArrayElementAtIndex (groupNo).FindPropertyRelative ("manufacture");
 										if (adding) {
 												manufacturing.InsertArrayElementAtIndex (point);
@@ -1207,7 +1292,21 @@ namespace TradeSys
 												manufacturing.DeleteArrayElementAtIndex (point);
 								}//end else manufacturing
 						}//end for all traders
+						if (goods) {//only need to edit spawners if goods edited
+								for (int s = 0; s<spawnerScripts.Length; s++)//go through all spawners
+										EditLists (spawnerScripts [s], groupNo, adding, point);
+						}//end if goods
 				}//end EditLists
+				
+				void EditLists (SerializedObject ts, int groupNo, bool adding, int point)
+				{//edit the goods lists for traders and spawners
+						SerializedProperty items = ts.FindProperty ("items").GetArrayElementAtIndex (groupNo).FindPropertyRelative ("items");
+						if (adding) {
+								items.InsertArrayElementAtIndex (point);
+								items.GetArrayElementAtIndex (point).FindPropertyRelative ("enabled").boolValue = true;
+						} else
+								items.DeleteArrayElementAtIndex (point);
+				}//end EditLists traders and spawners goods
 	
 				///go through all of the posts, and get the number of each item available
 				string[][] GetItemNumbers (List<GoodsTypes> goods, out long total)
@@ -1250,11 +1349,12 @@ namespace TradeSys
 								stock.InsertArrayElementAtIndex (loc);
 								stock.GetArrayElementAtIndex (loc).FindPropertyRelative ("stock").arraySize = 0;
 						}//end for posts
-						for (int t = 0; t<traderScripts.Length; t++) {//go through traders, adding
-								SerializedProperty items = traderScripts [t].FindProperty ("items");
-								items.InsertArrayElementAtIndex (loc);
-								items.GetArrayElementAtIndex (loc).FindPropertyRelative ("items").arraySize = 0;
-						}//end for traders
+						for (int t = 0; t<traderScripts.Length; t++) //go through traders, adding
+								AddGoodsGroup (traderScripts [t], loc);
+						
+						for (int s = 0; s<spawnerScripts.Length; s++) //go through spawners, adding
+								AddGoodsGroup (spawnerScripts [s], loc);
+			
 						goods.InsertArrayElementAtIndex (loc);
 						SerializedProperty newGood = goods.GetArrayElementAtIndex (loc);
 						newGood.FindPropertyRelative ("goods").arraySize = 0;
@@ -1262,6 +1362,13 @@ namespace TradeSys
 						GUIUtility.keyboardControl = 0;
 						controllerSO.FindProperty ("selected").FindPropertyRelative ("GG").intValue = loc;
 				}//end AddGoodsGroup
+				
+				void AddGoodsGroup (SerializedObject ts, int loc)
+				{//add a goods group to traders and spawners
+						SerializedProperty items = ts.FindProperty ("items");
+						items.InsertArrayElementAtIndex (loc);
+						items.GetArrayElementAtIndex (loc).FindPropertyRelative ("items").arraySize = 0;
+				}//end AddGoodsGroup traders and spawners
 	
 				///add a manufacturing group
 				void AddManGroup (int loc)
@@ -1494,5 +1601,15 @@ namespace TradeSys
 						}//end for each unit
 						return mass.ToString ();
 				}//end UnitString
+				
+				void SortCrate (SerializedProperty itemCrate)
+				{//sort out the information of the item crate
+						GameObject crate = (GameObject)itemCrate.objectReferenceValue;
+						crate.tag = Tags.I;//set tag to item
+						Item itemScript = crate.GetComponent<Item> ();
+			
+						if (itemScript == null)
+								itemScript = crate.AddComponent<Item> ();
+				}//end SortCrate
 		}//end ControllerEditor
 }//end namespace

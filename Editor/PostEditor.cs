@@ -71,7 +71,7 @@ namespace TradeSys
 				public override void OnInspectorGUI ()
 				{
 						#if !API
-						Undo.RecordObject (controllerNormal, "TradeSys Trade Post");
+						Undo.RecordObject (postNormal, "TradeSys Trade Post");
 						EditorGUIUtility.fieldWidth = 30f;
 						#endif	
 							
@@ -281,6 +281,8 @@ namespace TradeSys
 																								mi = 0;
 																						else if (mi > ma)
 																								mi = ma;
+																						if(ma < 0)
+																						ma = 0;
 																						//set min to be > 0 and < max
 									
 																						//set the numbers
