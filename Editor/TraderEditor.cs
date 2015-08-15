@@ -80,7 +80,7 @@ namespace CallumP.TradeSys
 						traderSO.Update ();
 						controllerSO.Update ();
 						
-			controllerNormal.SortTags(traderNormal.gameObject, true);//make sure factions there
+			traderNormal.factions = controllerNormal.SortTags(traderNormal.gameObject, true);//make sure factions there
 			
 						sel = GUITools.Toolbar (sel, new string[] {
 										"Settings",

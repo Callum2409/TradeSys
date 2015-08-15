@@ -233,13 +233,13 @@ namespace CallumP.TradeSys
 		#region faction group check
 				public bool CheckFactionsGroups (TradePost post1, TradePost post2)
 				{//check that the posts have a same group and faction
-						return TagManager.ShareEnabled (post1.gameObject, post2.gameObject, "Factions") && 
-								TagManager.ShareEnabled (post1.gameObject, post2.gameObject, "Groups");
+						return TagManager.ShareEnabled (post1.factions, post2.factions, "Factions") && 
+								TagManager.ShareEnabled (post1.groups, post2.groups, "Groups");
 				}//end CheckFactionsGroups
 				
 				public bool CheckTraderFaction (Trader trader, TradePost post)
 				{//Check that the trader is in the same faction as the trade post		
-						return TagManager.ShareEnabled (trader.gameObject, post.gameObject, "Factions");
+						return TagManager.ShareEnabled (trader.factions, post.factions, "Factions");
 				}//end CheckTraderFaction
 		#endregion
 	
@@ -373,6 +373,9 @@ namespace CallumP.TradeSys
 										thisPost.manufacture [m].manufacture.RemoveRange (manufacture [m].manufacture.Count, thisPost.manufacture [m].manufacture.Count - manufacture [m].manufacture.Count);
 						}
 						#endregion
+						
+			thisPost.factions = SortTags(thisPost.gameObject, true);
+			thisPost.groups = SortTags(thisPost.gameObject, false);
 				}//end SortTradePost
 		
 				public void SortTraders ()
@@ -412,6 +415,8 @@ namespace CallumP.TradeSys
 										thisTrader.manufacture [m].manufacture.RemoveRange (manufacture [m].manufacture.Count, thisTrader.manufacture [m].manufacture.Count - manufacture [m].manufacture.Count);
 						}
 						#endregion
+						
+			thisTrader.factions = SortTags(thisTrader.gameObject, true);//make sure factions there
 				}//end SortTrader
 				
 				public ObjectTags SortTags (GameObject obj, bool factionsGroups)

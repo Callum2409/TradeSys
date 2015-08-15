@@ -1,0 +1,24 @@
+fileFormatVersion: 2
+guid: b037e0d63eb4f72459c574d1e8b62609
+labels:
+- Trading
+- Manufacture
+- Manufacturing
+- Trade
+- Goods
+- Items
+- TradeSys
+- Cargo
+- Commodity
+- Sell
+- Buy
+- Shop
+- Merchant
+- Commodities
+- Spawner
+MonoImporter:
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 

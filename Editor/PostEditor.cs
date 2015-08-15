@@ -78,8 +78,8 @@ namespace CallumP.TradeSys
 						controllerSO.Update ();
 						
 						//make sure that the tags are sorted
-						controllerNormal.SortTags(postNormal.gameObject, true);
-			controllerNormal.SortTags(postNormal.gameObject, false);
+						postNormal.factions = controllerNormal.SortTags(postNormal.gameObject, true);
+			postNormal.groups = controllerNormal.SortTags(postNormal.gameObject, false);
 			
 						sel = GUITools.Toolbar (sel, new string[] {
 								"Settings",

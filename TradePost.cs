@@ -24,6 +24,8 @@ namespace CallumP.TradeSys
 				public bool allowTrades = true, allowManufacture = true;//whether a trade post is allowed to trade or manufacture items. Does not show in editor so everything keeps previous values
 		
 				public int postID;//this is the location within the post array in the controller
+				
+				public TagManagement.ObjectTags factions, groups;
 		#endregion
 	
 //System.Diagnostics.Stopwatch stoppy = new System.Diagnostics.Stopwatch();
@@ -34,8 +36,7 @@ namespace CallumP.TradeSys
 						tag = Tags.TP;
 			//make sure that the tags are sorted
 			controller.SortController();
-			controller.SortTags(gameObject, true);
-			controller.SortTags(gameObject, false);
+			controller.SortTradePost (this);
 				}//end Awake
 	
 				public void UpdatePrices ()

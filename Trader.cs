@@ -29,6 +29,8 @@ namespace CallumP.TradeSys
 				internal bool empty = true;//if the trader was not carrying anything
 				
 				bool expendable;//if expendable traders has been enabled in the controller
+				
+				public TagManagement.ObjectTags factions;
 
 				void Awake ()
 				{
@@ -39,8 +41,7 @@ namespace CallumP.TradeSys
 						expendable = controller.expTraders.enabled;
 						
 						controller.SortController();
-						controller.SortTags(gameObject, true);//make sure factions there
-			
+						controller.SortTrader(this);
 						
 						InvokeRepeating ("ManufactureCheck", 0, controller.updateInterval);//check for manufacture changes periodically. do this here so expendables can do it too
 				}//end Awake
