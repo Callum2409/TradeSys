@@ -242,8 +242,10 @@ namespace CallumP.TradeSys
 
     [System.Serializable]
     public class Currency
-    { //name of the currency
+    { //information about each currency
         public string single, plural;
+        public string name, symbolText;
+        public int decimals;
     }
 
     [System.Serializable]
