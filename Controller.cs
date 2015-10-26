@@ -1163,5 +1163,16 @@ namespace CallumP.TradeSys
                 return tradeLists[postID].buy;//return the buy list
             return tradeLists[postID].sell;//return the sell list
         }//end PostWantBuy
+
+        public string GetPriceFormatted(string format, float price, int decimals, string single, string plural)
+        { //return the string with the formatted price
+            try
+            {
+                return string.Format(format, price.ToString("n" + decimals), (price == 1) ? single : plural);
+            }
+            catch (System.Exception)
+            { }
+            return "Formatting not valid!";
+        }//end GetPriceFormatted
     }//end Controller
 }//end namespace

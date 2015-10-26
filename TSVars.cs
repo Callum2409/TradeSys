@@ -33,6 +33,7 @@ namespace CallumP.TradeSys
     {//contains all of the scroll positions
         public Vector2
                 S, //controller settings
+                C,//controller currencies
                 G, //controller goods
                 M, //controller manufacturing
                 GG, //goods group (horiz)
@@ -54,7 +55,7 @@ namespace CallumP.TradeSys
         public string name, unit;
         public bool expanded;
         public float basePrice, minPrice, maxPrice, mass;
-        public int postCount;
+        public int currencyID, postCount;
         public double average;
         public GameObject itemCrate;
         public float pausePerUnit;
@@ -243,9 +244,13 @@ namespace CallumP.TradeSys
     [System.Serializable]
     public class Currency
     { //information about each currency
-        public string single, plural;
-        public string name, symbolText;
+        public string single, plural, formatString;
         public int decimals;
+
+        #if UNITY_EDITOR
+        //only need the expanded variable if is in editor
+        public bool expanded;
+        #endif
     }
 
     [System.Serializable]
