@@ -122,7 +122,7 @@ namespace CallumP.TradeSys
 										#endregion
 					
 										#region pricing
-										int profit = 0;
+										float profit = 0;
 										for (int nm = 0; nm < cMan.needing.Count; nm++) {//go through all needing, getting min cost
 												NeedMake currentNM = cMan.needing [nm];
 												profit -= controller.goods [currentNM.groupID].goods [currentNM.itemID].minPrice * currentNM.number;

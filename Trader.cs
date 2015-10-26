@@ -16,7 +16,7 @@ namespace CallumP.TradeSys
 				internal bool onCall;//true if the trader has been given a destination post
 				internal bool allowGo = false;//whether the trader is allowed to move or not
 				public bool allowCollect;//whether the trader is allowed to collect dropped items
-				public int cash = 1000;//the amount of money that the trader has to buy items with
+				public float cash = 1000;//the amount of money that the trader has to buy items with
 				public double cargoSpace = 10, spaceRemaining;//the cargo space of the trader, and how much is left
 				public float closeDistance = 1.5f;//how far away the trader needs to be from the trade post before it registers as being there
 				public float stopTime;//how long the trader needs to stop for

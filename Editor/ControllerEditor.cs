@@ -827,9 +827,9 @@ namespace CallumP.TradeSys
                             }//end if not expendable
 
                             //get the prices
-                            int mi = currentGood.FindPropertyRelative("minPrice").intValue;
-                            int ma = currentGood.FindPropertyRelative("maxPrice").intValue;
-                            int ba = currentGood.FindPropertyRelative("basePrice").intValue;
+                            float mi = currentGood.FindPropertyRelative("minPrice").floatValue;
+                            float ma = currentGood.FindPropertyRelative("maxPrice").floatValue;
+                            float ba = currentGood.FindPropertyRelative("basePrice").floatValue;
 
                             if (ba < 1)
                                 ba = 1;
@@ -844,9 +844,9 @@ namespace CallumP.TradeSys
                             //set mas to be > base
 
                             //set the prices
-                            currentGood.FindPropertyRelative("minPrice").intValue = mi;
-                            currentGood.FindPropertyRelative("maxPrice").intValue = ma;
-                            currentGood.FindPropertyRelative("basePrice").intValue = ba;
+                            currentGood.FindPropertyRelative("minPrice").floatValue = mi;
+                            currentGood.FindPropertyRelative("maxPrice").floatValue = ma;
+                            currentGood.FindPropertyRelative("basePrice").floatValue = ba;
 
                             EditorGUILayout.EndVertical();
                         }//end if expanded

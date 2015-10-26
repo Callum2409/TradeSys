@@ -582,7 +582,7 @@ namespace CallumP.TradeSys
                     Goods cGood = goods[cTrade.groupID].goods[cTrade.itemID];//the current good
                     double mass = cGood.mass;//the mass of the good
                     Stock stock = post.stock[cTrade.groupID].stock[cTrade.itemID];//the stock
-                    int price = stock.price;//the price of the item
+                    float price = stock.price;//the price of the item
 
                     //need to check quantity again because are loading more than one type of item, and quantity was based on full loads
                     int quantity = Mathf.Min((int)System.Math.Floor(trader.spaceRemaining / mass), cTrade.quantity);
@@ -723,7 +723,6 @@ namespace CallumP.TradeSys
                     return false;
                 }
                 SendToPost(trader, reachable[Random.Range(0, reachable.Length)].post, true, 0);//send the trader to the post
-
             }
             else//end check in the same faction as the trader
                 Debug.LogError(trader.name + " is not in the same faction as the starting trade post, so is not able to make any trades ");
@@ -839,7 +838,7 @@ namespace CallumP.TradeSys
 
                             if (quantity > 0)
                             {//only work out profit and add if there is more than one to trade		
-                                int profit = (postScripts[currentPostID].stock[cI.groupID].stock[cI.itemID].price * quantity) -
+                                float profit = (postScripts[currentPostID].stock[cI.groupID].stock[cI.itemID].price * quantity) -
                                         (postScripts[postID].stock[cI.groupID].stock[cI.itemID].price * quantity);
                                 trades.Add(new TradeInfo
                                 {
@@ -1104,7 +1103,7 @@ namespace CallumP.TradeSys
         public TradePost PostBuyCheapest(TradePost currentPost, int groupID, int itemID)
         {//find the cheapest post to buy from
             Distances[] toCheck = DistWithCur(currentPost);
-            int bestPrice = int.MaxValue;
+            float bestPrice = Mathf.Infinity;
             TradePost bestPost = new TradePost();
             for (int p = 0; p < toCheck.Length; p++)
             {//go through all closest posts
@@ -1125,7 +1124,7 @@ namespace CallumP.TradeSys
         public TradePost PostSellExpensive(TradePost currentPost, int groupID, int itemID)
         {//find the post which will pay the most to buy the item
             Distances[] toCheck = DistWithCur(currentPost);
-            int bestPrice = 0;
+            float bestPrice = 0;
             TradePost bestPost = new TradePost();
             for (int p = 0; p < toCheck.Length; p++)
             {//go through all closest posts

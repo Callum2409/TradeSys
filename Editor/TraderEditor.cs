@@ -152,8 +152,8 @@ traderNormal.gameObject.transform.position = traderNormal.target.transform.posit
 										if (cargoSpace.floatValue < 0.000001f)
 												cargoSpace.floatValue = 0.000001f;
 					
-										if (cash.intValue < 0)
-												cash.intValue = 0;
+										if (cash.floatValue < 0)
+												cash.floatValue = 0;
 														
 										if (controllerNormal.pickUp)//only need to show this if is enabled in the controller
 												EditorGUILayout.PropertyField (collect, new GUIContent ("Allow collection", "If enabled, will allow this trader to collect dropped items"));

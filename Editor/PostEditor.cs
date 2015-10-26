@@ -239,7 +239,7 @@ namespace CallumP.TradeSys
 																						if (price.intValue < 1)
 																								price.intValue = 1;
 																				} else if (controllerSO.FindProperty ("showPrices").boolValue)
-																						EditorGUILayout.LabelField ("Price", currentStock.FindPropertyRelative ("price").intValue.ToString ());
+																						EditorGUILayout.LabelField ("Price", currentStock.FindPropertyRelative ("price").floatValue.ToString ());
 							
 																				EditorGUILayout.EndVertical ();//end show price vertical
 																				EditorGUILayout.EndHorizontal ();//end name number horizontal

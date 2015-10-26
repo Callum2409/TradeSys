@@ -18,7 +18,7 @@ I hope this is useful in creating your GUI!
 	
 		public float closeDistance = 1;//how close the player needs to be before counting as being at the trade post or to collect an item
 		public double cargoSpace = 10;//the cargo space that the player has
-		public int cash = 1000;//the cash that the player has
+		public float cash = 1000;//the cash that the player has
 		int[][] cargo;//the cargo being carried by the player
 	
 		double spaceRemaining;//the amount of cargo space remaining
@@ -288,7 +288,7 @@ I hope this is useful in creating your GUI!
 												GUI.Label (new Rect (210, labelPos * 30, 150, 30), "Mass: " + cG.unit);//show the mass of the item with the unit
 												GUI.Label (new Rect (370, labelPos * 30, 150, 30), "Post has: " + pS.number);//the number that the trade post has
 						
-												int itemCost = selected == 0 ? pS.price : Mathf.RoundToInt (pS.price * controller.purchasePercent);
+												float itemCost = selected == 0 ? pS.price : Mathf.RoundToInt (pS.price * controller.purchasePercent);
 												//if is in buy mode, the item cost is the standard price, if selling, need to multiply by purhcase percent
 						
 												GUI.Label (new Rect (530, labelPos * 30, 150, 30), "Price: " + itemCost);

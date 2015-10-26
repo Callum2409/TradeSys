@@ -53,8 +53,8 @@ namespace CallumP.TradeSys
     {//contains all of the information about each good
         public string name, unit;
         public bool expanded;
-        public int basePrice, minPrice, maxPrice, postCount;
-        public float mass;
+        public float basePrice, minPrice, maxPrice, mass;
+        public int postCount;
         public double average;
         public GameObject itemCrate;
         public float pausePerUnit;
@@ -104,7 +104,7 @@ namespace CallumP.TradeSys
         public string name;
         public bool buy, sell, hidden, minMax;
         public int number;
-        public int price = 0;
+        public float price = 0;
         public int min, max;
 
         public int CompareTo(Stock other)
