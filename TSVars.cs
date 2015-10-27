@@ -25,7 +25,8 @@ namespace CallumP.TradeSys
             T,//trader
             S,//spawner
             GG, //goods group
-            MG;//manufacture group
+            MG,//manufacture group
+            CC;//the currency tab
     }
 
     [System.Serializable]

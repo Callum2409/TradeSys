@@ -65,8 +65,7 @@ namespace CallumP.TradeSys
             else
                 //The price is found by dividing the average by the number of that item available at the post.
                 //This is then multiplied by the base price, and is clamped between the min and max.
-                currentS.price = (float)System.Math.Round(Mathf.Clamp(currentG.basePrice * (((float)currentG.average) / currentS.number),
--currentG.minPrice, currentG.maxPrice), 3, System.MidpointRounding.AwayFromZero);
+                currentS.price = (float)System.Math.Round(Mathf.Clamp(currentG.basePrice * (((float)currentG.average) / currentS.number), currentG.minPrice, currentG.maxPrice), controller.currencies[controller.goods[g].goods[i].currencyID].decimals, System.MidpointRounding.AwayFromZero);
         }//end UpdateSinglePrice
 
         public void ManufactureCheck()

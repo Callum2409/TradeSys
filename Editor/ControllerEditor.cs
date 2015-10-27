@@ -61,7 +61,6 @@ namespace CallumP.TradeSys
         private SerializedProperty closestPosts, buyMultiple, sellMultiple, distanceWeight, profitWeight, purchasePercent, priceUpdates, moveType, expTraders;
         private SerializedProperty units;
         bool expendable;
-        private ReorderableList currencyList;
         #endregion
 
         ///get the required information
@@ -144,8 +143,6 @@ namespace CallumP.TradeSys
             #endregion
 
             controllerNormal.SortAll();
-
-            //  CurrencyList();//set up the currency reorderable list
         }//end OnEnable
 
         public override void OnInspectorGUI()
@@ -168,6 +165,7 @@ namespace CallumP.TradeSys
             int[] groupLengthsG = new int[goods.arraySize];//contains the length of each group, so can convert between int and groupID and itemID
 
             controllerNormal.allNames = new string[controllerNormal.goods.Count][];//an array of names of goods in groups
+            string[] currencyNames = controllerNormal.currencies.Select(c => c.plural).ToArray<string>(); ;//get an array of all of the currency names
 
             for (int g1 = 0; g1 < goods.arraySize; g1++)
             {//go through all groups
@@ -433,7 +431,7 @@ namespace CallumP.TradeSys
                                 maxNoTraders.intValue = 0;
 
                             GUILayout.FlexibleSpace();
-                            EditorGUILayout.LabelField("Number of expendable traders", number.ToString());
+                            EditorGUILayout.LabelField("Number of expendable traders:", number.ToString());
 
                             if (GUITools.PlusMinus(true))
                             {
@@ -585,86 +583,159 @@ namespace CallumP.TradeSys
                     EditorGUI.indentLevel = 0;
 
                     EditorGUILayout.BeginHorizontal();
-                    EditorGUILayout.LabelField("Number of currencies", currencies.arraySize.ToString());
                     GUILayout.FlexibleSpace();
-
-                    if (GUILayout.Button(new GUIContent("Add", "Add a new currency"), EditorStyles.miniButtonLeft))
-                    {
-                        int index = currencies.arraySize;
-                        currencies.InsertArrayElementAtIndex(index);
-                        SerializedProperty newCur = currencies.GetArrayElementAtIndex(index);
-                        newCur.FindPropertyRelative("single").stringValue = newCur.FindPropertyRelative("plural").stringValue = "New currency";
-                        newCur.FindPropertyRelative("formatString").stringValue = "{0} {1}";
-                        newCur.FindPropertyRelative("decimals").intValue = 0;
-                        newCur.FindPropertyRelative("expanded").boolValue = currencies.GetArrayElementAtIndex(index - 1).FindPropertyRelative("expanded").boolValue;
-                    }//end if added currency
-
-                    GUITools.ExpandCollapse(currencies, "expanded", true);
+                    sel.CC = GUILayout.Toolbar(sel.CC, new string[] { "Currencies", "Exchanges" });
+                    GUILayout.FlexibleSpace();
                     EditorGUILayout.EndHorizontal();
 
-                    EditorGUILayout.BeginVertical("HelpBox");
-                    EditorStyles.label.wordWrap = true;
-                    EditorGUILayout.LabelField("The currency will be referred to using the plural name given.\n\nIn the format string, symbols or other text can be added before or after the value. Must contain {0}.\n{0} : price\n{1} : single or plural name, depending on amount");
-                    EditorGUILayout.EndVertical();
-
-                    scrollPos.C = GUITools.StartScroll(scrollPos.C, smallScroll);
-
-                    for (int c = 0; c < currencies.arraySize; c++)
-                    { //go through all currencies, displaying them
-                        EditorGUI.indentLevel = 0;
-                        SerializedProperty currentCur = currencies.GetArrayElementAtIndex(c);//current currency
-
-                        EditorGUILayout.LabelField("", "", "PopupCurveSwatchBackground", GUILayout.MaxHeight(0f));
-
-                        if (currentCur.FindPropertyRelative("expanded").boolValue)//if expanded
-                            EditorGUILayout.BeginVertical("HelpBox");//show everything in a box together
-
-                        //do the title bar things
-                        EditorGUILayout.BeginHorizontal();
-                        currentCur.FindPropertyRelative("expanded").boolValue = GUITools.TitleButton(new GUIContent(currentCur.FindPropertyRelative("plural").stringValue, ""), currentCur.FindPropertyRelative("expanded"), "ControlLabel");
-                        GUILayout.FlexibleSpace();
-
-                        if (currencies.arraySize > 1 && GUITools.PlusMinus(false))
-                        { //if remove
-                            currencies.DeleteArrayElementAtIndex(c);
-                            break;
-                        }//end if remove
-                        EditorGUILayout.EndHorizontal();
-
-                        if (currentCur.FindPropertyRelative("expanded").boolValue)
-                        {//if expanded
-                            EditorGUI.indentLevel = 1;
-
-                            EditorGUIUtility.labelWidth = 150;
-
+                    switch (sel.CC)
+                    { //switch for currency or exchange tab
+                        case 0:
                             EditorGUILayout.BeginHorizontal();
-                            EditorGUILayout.PropertyField(currentCur.FindPropertyRelative("single"), new GUIContent("Singular name", "The singlar name for the currency"));
-                            EditorGUILayout.PropertyField(currentCur.FindPropertyRelative("plural"), new GUIContent("Plural name", "The plural name of the currency. This name will be used when referencing the currency"));
+                            EditorGUILayout.LabelField("Number of currencies", currencies.arraySize.ToString());
+                            GUILayout.FlexibleSpace();
+
+                            if (GUILayout.Button(new GUIContent("Add", "Add a new currency"), EditorStyles.miniButtonLeft))
+                            {
+                                int index = currencies.arraySize;
+                                currencies.InsertArrayElementAtIndex(index);
+                                SerializedProperty newCur = currencies.GetArrayElementAtIndex(index);
+                                newCur.FindPropertyRelative("single").stringValue = newCur.FindPropertyRelative("plural").stringValue = "New currency";
+                                newCur.FindPropertyRelative("formatString").stringValue = "{0} {1}";
+                                newCur.FindPropertyRelative("decimals").intValue = 0;
+                                newCur.FindPropertyRelative("expanded").boolValue = currencies.GetArrayElementAtIndex(index - 1).FindPropertyRelative("expanded").boolValue;
+                            }//end if added currency
+
+                            GUITools.ExpandCollapse(currencies, "expanded", true);
                             EditorGUILayout.EndHorizontal();
 
-                            if (currentCur.FindPropertyRelative("single").stringValue == "")
-                                currentCur.FindPropertyRelative("single").stringValue = "New currency";
-                            if (currentCur.FindPropertyRelative("plural").stringValue == "")
-                                currentCur.FindPropertyRelative("plural").stringValue = "New currency";
-
-                            EditorGUILayout.PropertyField(currentCur.FindPropertyRelative("formatString"), new GUIContent("Format", "Set the format to be used when displaying costs"));
-                            EditorGUILayout.IntSlider(currentCur.FindPropertyRelative("decimals"), 0, 5, new GUIContent("Decimal places", "The number of decimal places the currency will be displayed to"));
-
-                            if (!currentCur.FindPropertyRelative("formatString").stringValue.Contains("{0}"))
-                                currentCur.FindPropertyRelative("formatString").stringValue = "{0} {1}";
-
-                            string s = controllerNormal.GetPriceFormatted(currentCur.FindPropertyRelative("formatString").stringValue, 1f, currentCur.FindPropertyRelative("decimals").intValue, currentCur.FindPropertyRelative("single").stringValue, currentCur.FindPropertyRelative("plural").stringValue);
-                            string p = controllerNormal.GetPriceFormatted(currentCur.FindPropertyRelative("formatString").stringValue, Mathf.PI, currentCur.FindPropertyRelative("decimals").intValue, currentCur.FindPropertyRelative("single").stringValue, currentCur.FindPropertyRelative("plural").stringValue);
-
-                            EditorGUILayout.LabelField(string.Format("Examples:\n    {0}\n    {1}", s, p));
-
+                            EditorGUILayout.BeginVertical("HelpBox");
+                            EditorStyles.label.wordWrap = true;
+                            EditorGUILayout.LabelField("The currency will be referred to using the plural name given.\n\nIn the format string, symbols or other text can be added before or after the value. Prices may not be given to full number of decimal places if number is large. Must contain {0}.\n{0} : price\n{1} : single or plural name, depending on amount");
                             EditorGUILayout.EndVertical();
-                        }//end if expanded
-                    }//end for all currencies
+
+                            scrollPos.C = GUITools.StartScroll(scrollPos.C, smallScroll);
+
+                            for (int c = 0; c < currencies.arraySize; c++)
+                            { //go through all currencies, displaying them
+                                EditorGUI.indentLevel = 0;
+                                SerializedProperty currentCur = currencies.GetArrayElementAtIndex(c);//current currency
+
+                                EditorGUILayout.LabelField("", "", "PopupCurveSwatchBackground", GUILayout.MaxHeight(0f));
+
+                                if (currentCur.FindPropertyRelative("expanded").boolValue)//if expanded
+                                    EditorGUILayout.BeginVertical("HelpBox");//show everything in a box together
+
+                                //do the title bar things
+                                EditorGUILayout.BeginHorizontal();
+                                currentCur.FindPropertyRelative("expanded").boolValue = GUITools.TitleButton(new GUIContent(currentCur.FindPropertyRelative("plural").stringValue, ""), currentCur.FindPropertyRelative("expanded"), "ControlLabel");
+                                GUILayout.FlexibleSpace();
+
+                                if (currencies.arraySize > 1 && GUITools.PlusMinus(false))
+                                { //if remove
+                                    currencies.DeleteArrayElementAtIndex(c);
+                                    break;
+                                }//end if remove
+                                EditorGUILayout.EndHorizontal();
+
+                                if (currentCur.FindPropertyRelative("expanded").boolValue)
+                                {//if expanded
+                                    EditorGUI.indentLevel = 1;
+
+                                    EditorGUIUtility.labelWidth = 150;
+
+                                    EditorGUILayout.BeginHorizontal();
+                                    EditorGUILayout.PropertyField(currentCur.FindPropertyRelative("single"), new GUIContent("Singular name", "The singlar name for the currency"));
+                                    EditorGUILayout.PropertyField(currentCur.FindPropertyRelative("plural"), new GUIContent("Plural name", "The plural name of the currency. This name will be used when referencing the currency"));
+                                    EditorGUILayout.EndHorizontal();
+
+                                    if (currentCur.FindPropertyRelative("single").stringValue == "")
+                                        currentCur.FindPropertyRelative("single").stringValue = "New currency";
+                                    if (currentCur.FindPropertyRelative("plural").stringValue == "")
+                                        currentCur.FindPropertyRelative("plural").stringValue = "New currency";
+
+                                    EditorGUILayout.PropertyField(currentCur.FindPropertyRelative("formatString"), new GUIContent("Format", "Set the format to be used when displaying costs"));
+                                    EditorGUILayout.IntSlider(currentCur.FindPropertyRelative("decimals"), 0, 5, new GUIContent("Decimal places", "The number of decimal places the currency will be displayed to"));
+
+                                    if (!currentCur.FindPropertyRelative("formatString").stringValue.Contains("{0}"))
+                                        currentCur.FindPropertyRelative("formatString").stringValue = "{0} {1}";
+
+                                    string s = controllerNormal.GetPriceFormatted(currentCur.FindPropertyRelative("formatString").stringValue, 1f, currentCur.FindPropertyRelative("decimals").intValue, currentCur.FindPropertyRelative("single").stringValue, currentCur.FindPropertyRelative("plural").stringValue);
+                                    string p = controllerNormal.GetPriceFormatted(currentCur.FindPropertyRelative("formatString").stringValue, Mathf.PI, currentCur.FindPropertyRelative("decimals").intValue, currentCur.FindPropertyRelative("single").stringValue, currentCur.FindPropertyRelative("plural").stringValue);
+
+                                    EditorGUILayout.LabelField(string.Format("Examples:\n    {0}\n    {1}", s, p));
+
+                                    EditorGUILayout.EndVertical();
+                                }//end if expanded
+                            }//end for all currencies
+                            if (currencies.arraySize > 0)
+                                EditorGUILayout.LabelField("", "", "PopupCurveSwatchBackground", GUILayout.MaxHeight(0f));
+                            break;
+
+                        case 1://exchange tab
+                            EditorGUILayout.BeginHorizontal();
+                            EditorGUILayout.LabelField("Number of currency exchanges:", exchange.arraySize.ToString());
+                            GUILayout.FlexibleSpace();
+
+                            if(GUITools.PlusMinus(true))
+                            { //if add new exchange
+                                int index = exchange.arraySize;
+                                exchange.InsertArrayElementAtIndex(index);
+                                SerializedProperty newEx = exchange.GetArrayElementAtIndex(index);
+                                newEx.FindPropertyRelative("numberA").floatValue = newEx.FindPropertyRelative("numberB").floatValue = 1;
+                                newEx.FindPropertyRelative("IDA").intValue = newEx.FindPropertyRelative("IDB").intValue = 0;
+                                newEx.FindPropertyRelative("reverse").boolValue = false;
+                            }//end add new exchange
+
+                            EditorGUILayout.EndHorizontal();
+
+                            scrollPos.C = GUITools.StartScroll(scrollPos.C, smallScroll);
+
+                            EditorGUIUtility.labelWidth = Screen.width / 4;
+
+                            for (int e = 0; e < exchange.arraySize; e++)
+                            { //for all exchanges
+                                SerializedProperty curEx = exchange.GetArrayElementAtIndex(e);
+                                EditorGUILayout.LabelField("", "", "PopupCurveSwatchBackground", GUILayout.MaxHeight(0f));
+
+                                GUI.color = ExchangeIssue(curEx, e) ? Color.red : Color.white;
+
+                                EditorGUILayout.BeginHorizontal();
+                                EditorGUILayout.PropertyField(curEx.FindPropertyRelative("numberA"), GUIContent.none);
+                                curEx.FindPropertyRelative("IDA").intValue = EditorGUILayout.Popup("", curEx.FindPropertyRelative("IDA").intValue, currencyNames, "DropDownButton");
+                                EditorGUILayout.LabelField(curEx.FindPropertyRelative("reverse").boolValue ? "\u2194" : "\u2192");
+                                EditorGUILayout.PropertyField(curEx.FindPropertyRelative("numberB"), GUIContent.none);
+                                curEx.FindPropertyRelative("IDB").intValue = EditorGUILayout.Popup("", curEx.FindPropertyRelative("IDB").intValue, currencyNames, "DropDownButton");
+                                EditorGUILayout.PropertyField(curEx.FindPropertyRelative("reverse"), new GUIContent("", "Allow the exchange to operate in reverse"), GUILayout.Width(15f));
+
+                                if(GUITools.PlusMinus(false))
+                                {
+                                    exchange.DeleteArrayElementAtIndex(e);
+                                    break;
+                                }//end if remove pressed
+                                EditorGUILayout.EndHorizontal();
+
+                                GUI.color = Color.white;
+
+                                float a = curEx.FindPropertyRelative("numberA").floatValue;
+                                float b = curEx.FindPropertyRelative("numberB").floatValue;
+
+                                if (a <= 0)
+                                    a = 1;
+                                if (b <= 0)
+                                    b = 1;
+
+                                a = (float)System.Math.Round(a, controllerNormal.currencies[curEx.FindPropertyRelative("IDA").intValue].decimals, System.MidpointRounding.AwayFromZero);
+                                b = (float)System.Math.Round(b, controllerNormal.currencies[curEx.FindPropertyRelative("IDB").intValue].decimals, System.MidpointRounding.AwayFromZero);
+
+                                curEx.FindPropertyRelative("numberA").floatValue = a;
+                                curEx.FindPropertyRelative("numberB").floatValue = b;
+
+                            }//end for all exchanges
+                            break;
+                    }//end currency switch
 
                     EditorGUI.indentLevel = 0;
-                    if (currencies.arraySize > 0)
-                        EditorGUILayout.LabelField("", "", "PopupCurveSwatchBackground", GUILayout.MaxHeight(0f));
                     if (smallScroll.boolValue)//if small scroll enabled, then end the scroll view
                         EditorGUILayout.EndScrollView();
                     break;
@@ -719,7 +790,7 @@ namespace CallumP.TradeSys
                     EditorGUILayout.EndHorizontal();
                     //information with number of goods, sort, expand and collapse
                     EditorGUILayout.BeginHorizontal();
-                    EditorGUILayout.LabelField("Number of goods", currentGoodsGroup.arraySize.ToString());
+                    EditorGUILayout.LabelField("Number of goods:", currentGoodsGroup.arraySize.ToString());
                     GUILayout.FlexibleSpace();
                     GUI.enabled = currentGoodsGroup.arraySize > 0 && !Application.isPlaying;
                     if (GUILayout.Button(new GUIContent("Sort", "Sort the goods by name alphabetically"), EditorStyles.miniButtonLeft, GUILayout.MinWidth(45f)))
@@ -900,7 +971,10 @@ namespace CallumP.TradeSys
 
                             if (!expendable)
                             {//only show the prices if not expendable
+                                EditorGUILayout.BeginHorizontal();
                                 EditorGUILayout.LabelField("Prices", EditorStyles.boldLabel);//bold prices label for sub section
+                                currentGood.FindPropertyRelative("currencyID").intValue = EditorGUILayout.Popup(currentGood.FindPropertyRelative("currencyID").intValue, currencyNames, "MiniPullDown");
+                                EditorGUILayout.EndHorizontal();
                                 EditorGUI.indentLevel = 2;
                                 EditorGUILayout.BeginHorizontal();
                                 EditorGUILayout.PropertyField(currentGood.FindPropertyRelative("basePrice"), new GUIContent("Base price", "If a trade post has the average number of this item, this is the price. The prices are set against this"));
@@ -928,6 +1002,12 @@ namespace CallumP.TradeSys
                             if (ma < ba)
                                 ma = ba;
                             //set mas to be > base
+
+                            //sort out the decimal places
+                            int decimals = controllerNormal.currencies[currentGood.FindPropertyRelative("currencyID").intValue].decimals;
+                            mi = (float)System.Math.Round(mi, decimals, System.MidpointRounding.AwayFromZero);
+                            ma = (float)System.Math.Round(ma, decimals, System.MidpointRounding.AwayFromZero);
+                            ba = (float)System.Math.Round(ba, decimals, System.MidpointRounding.AwayFromZero);
 
                             //set the prices
                             currentGood.FindPropertyRelative("minPrice").floatValue = mi;
@@ -1014,7 +1094,7 @@ namespace CallumP.TradeSys
                     EditorGUILayout.EndHorizontal();
                     //information with number of processes, expand and collapse
                     EditorGUILayout.BeginHorizontal();
-                    EditorGUILayout.LabelField("Number of processes", currentManGroup.arraySize.ToString());
+                    EditorGUILayout.LabelField("Number of processes:", currentManGroup.arraySize.ToString());
                     GUILayout.FlexibleSpace();
 
                     GUI.enabled = manufacture.arraySize > 0 && CheckMan();
@@ -1751,45 +1831,30 @@ namespace CallumP.TradeSys
             return true;
         }//end CheckMan
 
-        void CurrencyList()
-        {//make a list for all of the currencies
-            SerializedProperty curPro = controllerSO.FindProperty("currencies");
-            currencyList = new ReorderableList(controllerSO, curPro, false, true, true, true);
-            currencyList.elementHeight = 2 * currencyList.elementHeight;
+        bool ExchangeIssue(SerializedProperty curEx, int index)
+        { //return whether there is an issue with the selected exchange
+            int a1 = curEx.FindPropertyRelative("IDA").intValue;
+            int b1 = curEx.FindPropertyRelative("IDB").intValue;
+            bool r1 = curEx.FindPropertyRelative("reverse").boolValue;
 
-            currencyList.drawHeaderCallback = (Rect rect) =>
-            { //make the header
-                EditorGUI.LabelField(rect, new GUIContent("Currencies", "The currencies used within the game"), EditorStyles.boldLabel);
-            };//end drawHeader
+            if (a1 == b1)
+                return true;//return true if both the same on same exchange
 
-            currencyList.drawElementCallback = (Rect rect, int index, bool isActive, bool isFocused) =>
-            { //draw elements
-                EditorGUIUtility.labelWidth = 100;
-                SerializedProperty element = curPro.GetArrayElementAtIndex(index);
+            for(int e = 0; e<exchange.arraySize; e++)
+            { //go through all, making sure not duplicated
+                if(e != index) { //if not the same as the one to be checked
+                    SerializedProperty ex = exchange.GetArrayElementAtIndex(e);
+                    int a2 = ex.FindPropertyRelative("IDA").intValue;
+                    int b2 = ex.FindPropertyRelative("IDB").intValue;
+                    bool r2 = ex.FindPropertyRelative("reverse").boolValue;
 
-                EditorGUI.PropertyField(new Rect(rect.x, rect.y, rect.width / 2 - 15, EditorGUIUtility.singleLineHeight), element.FindPropertyRelative("single"), new GUIContent("Name", "The singlar name for the currency"));
-                EditorGUI.PropertyField(new Rect(rect.width / 2 + 15, rect.y, rect.width / 2, EditorGUIUtility.singleLineHeight), element.FindPropertyRelative("plural"), new GUIContent("Plural name", "The plural name of the currency"));
-                EditorGUI.PropertyField(new Rect(rect.x, rect.y + EditorGUIUtility.singleLineHeight + 5, rect.width / 2 - 15, EditorGUIUtility.singleLineHeight), element.FindPropertyRelative("symbolText"), new GUIContent("Format text", "Set how the currency will be displayed. "));
+                    if ((a1 == a2 && b1 == b2) ||//if same a1, a2 and b1, b2
+                        (r1 || r2) && a1 == b2 && b1 == a2)//or if reverse and check a1, b2 and b1, a2
+                        return true;//has same values, so return true
+                }//end not same
+            }//end for duplicate check
 
-                //check that name isnt blank
-                if (element.FindPropertyRelative("single").stringValue == "")
-                    element.FindPropertyRelative("single").stringValue = "New currency";
-
-                if (element.FindPropertyRelative("plural").stringValue == "")
-                    element.FindPropertyRelative("plural").stringValue = "New currency";
-
-            };//end drawElement
-
-            currencyList.onCanRemoveCallback = (ReorderableList l) =>
-            { //if can remove
-                return l.count > 1;//only remove if more than one currency
-            };//end onCanRemove
-
-            currencyList.onAddCallback = (ReorderableList l) =>
-            { //add element
-                l.serializedProperty.arraySize++;//increase the array size
-                l.serializedProperty.GetArrayElementAtIndex(l.count - 1).FindPropertyRelative("single").stringValue = l.serializedProperty.GetArrayElementAtIndex(l.count - 1).FindPropertyRelative("plural").stringValue = "New currency";//set the name
-            };//end onAdd
-        }//end CurrencyList
+            return false;
+        }//end ExchangeIssue
     }//end ControllerEditor
 }//end namespace
