@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEditor;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace CallumP.TradeSys
 {//use namespace to stop any name conflicts
@@ -516,5 +517,10 @@ namespace CallumP.TradeSys
 				
 						return scrollPos;//need to return this so that scrolling work
 				}//end EnableDisableGoods
-		}//end TSGUI
+
+        public void GetCurrencyNames(Controller controller)
+        { //get the names of all of the currencies
+            controller.currencyNames = controller.currencies.Select(c => c.plural).ToArray<string>(); ;//get an array of all of the currency names
+        }//end GetCurrencyNames
+    }//end TSGUI
 }//end namespace

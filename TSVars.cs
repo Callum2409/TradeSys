@@ -26,7 +26,8 @@ namespace CallumP.TradeSys
             S,//spawner
             GG, //goods group
             MG,//manufacture group
-            CC;//the currency tab
+            CC,//currency tab in controller
+            PC;//currency tab in post
     }
 
     [System.Serializable]
@@ -40,6 +41,7 @@ namespace CallumP.TradeSys
                 GG, //goods group (horiz)
                 MG,//manufacture group (horiz)
                 PS, //post settings
+                PC,//post currencies
                 PG, //post goods
                 PM, //post manufacturing
                 TS, //trader settings
@@ -248,10 +250,10 @@ namespace CallumP.TradeSys
         public string single, plural, formatString;
         public int decimals;
 
-        #if UNITY_EDITOR
+#if UNITY_EDITOR
         //only need the expanded variable if is in editor
         public bool expanded;
-        #endif
+#endif
     }
 
     [System.Serializable]

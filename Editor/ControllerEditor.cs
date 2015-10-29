@@ -165,7 +165,7 @@ namespace CallumP.TradeSys
             int[] groupLengthsG = new int[goods.arraySize];//contains the length of each group, so can convert between int and groupID and itemID
 
             controllerNormal.allNames = new string[controllerNormal.goods.Count][];//an array of names of goods in groups
-            string[] currencyNames = controllerNormal.currencies.Select(c => c.plural).ToArray<string>(); ;//get an array of all of the currency names
+            GUITools.GetCurrencyNames(controllerNormal);
 
             for (int g1 = 0; g1 < goods.arraySize; g1++)
             {//go through all groups
@@ -582,11 +582,7 @@ namespace CallumP.TradeSys
                 case 1:
                     EditorGUI.indentLevel = 0;
 
-                    EditorGUILayout.BeginHorizontal();
-                    GUILayout.FlexibleSpace();
-                    sel.CC = GUILayout.Toolbar(sel.CC, new string[] { "Currencies", "Exchanges" });
-                    GUILayout.FlexibleSpace();
-                    EditorGUILayout.EndHorizontal();
+                    sel.CC = GUITools.Toolbar(sel.CC, new string[] { "Currencies", "Exchanges" });
 
                     switch (sel.CC)
                     { //switch for currency or exchange tab
@@ -611,7 +607,7 @@ namespace CallumP.TradeSys
 
                             EditorGUILayout.BeginVertical("HelpBox");
                             EditorStyles.label.wordWrap = true;
-                            EditorGUILayout.LabelField("The currency will be referred to using the plural name given.\n\nIn the format string, symbols or other text can be added before or after the value. Prices may not be given to full number of decimal places if number is large. Must contain {0}.\n{0} : price\n{1} : single or plural name, depending on amount");
+                            EditorGUILayout.LabelField("The currency will be referred to using the plural name given.\n\nIn the format string, symbols or other text can be added before or after the value. Prices may not be given to full number of decimal places if number is large..\n{0} : price\n{1} : single or plural name, depending on amount\n\nMust contain {0}");
                             EditorGUILayout.EndVertical();
 
                             scrollPos.C = GUITools.StartScroll(scrollPos.C, smallScroll);
@@ -686,8 +682,11 @@ namespace CallumP.TradeSys
                                 newEx.FindPropertyRelative("IDA").intValue = newEx.FindPropertyRelative("IDB").intValue = 0;
                                 newEx.FindPropertyRelative("reverse").boolValue = false;
                             }//end add new exchange
-
                             EditorGUILayout.EndHorizontal();
+
+                            EditorGUILayout.BeginVertical("HelpBox");
+                            EditorGUILayout.LabelField("Enter the number of a curreny and the currency type to then be converted. Tick the checkbox to allow the conversion to happen in reverse. This will also make the arrow two way to indicate.\n\nExchanges where there are errors are highlighted in red.");
+                            EditorGUILayout.EndVertical();
 
                             scrollPos.C = GUITools.StartScroll(scrollPos.C, smallScroll);
 
@@ -702,10 +701,10 @@ namespace CallumP.TradeSys
 
                                 EditorGUILayout.BeginHorizontal();
                                 EditorGUILayout.PropertyField(curEx.FindPropertyRelative("numberA"), GUIContent.none);
-                                curEx.FindPropertyRelative("IDA").intValue = EditorGUILayout.Popup("", curEx.FindPropertyRelative("IDA").intValue, currencyNames, "DropDownButton");
+                                curEx.FindPropertyRelative("IDA").intValue = EditorGUILayout.Popup("", curEx.FindPropertyRelative("IDA").intValue, controllerNormal.currencyNames, "DropDownButton");
                                 EditorGUILayout.LabelField(curEx.FindPropertyRelative("reverse").boolValue ? "\u2194" : "\u2192");
                                 EditorGUILayout.PropertyField(curEx.FindPropertyRelative("numberB"), GUIContent.none);
-                                curEx.FindPropertyRelative("IDB").intValue = EditorGUILayout.Popup("", curEx.FindPropertyRelative("IDB").intValue, currencyNames, "DropDownButton");
+                                curEx.FindPropertyRelative("IDB").intValue = EditorGUILayout.Popup("", curEx.FindPropertyRelative("IDB").intValue, controllerNormal.currencyNames, "DropDownButton");
                                 EditorGUILayout.PropertyField(curEx.FindPropertyRelative("reverse"), new GUIContent("", "Allow the exchange to operate in reverse"), GUILayout.Width(15f));
 
                                 if(GUITools.PlusMinus(false))
@@ -973,7 +972,7 @@ namespace CallumP.TradeSys
                             {//only show the prices if not expendable
                                 EditorGUILayout.BeginHorizontal();
                                 EditorGUILayout.LabelField("Prices", EditorStyles.boldLabel);//bold prices label for sub section
-                                currentGood.FindPropertyRelative("currencyID").intValue = EditorGUILayout.Popup(currentGood.FindPropertyRelative("currencyID").intValue, currencyNames, "MiniPullDown");
+                                currentGood.FindPropertyRelative("currencyID").intValue = EditorGUILayout.Popup(currentGood.FindPropertyRelative("currencyID").intValue, controllerNormal.currencyNames, "MiniPullDown");
                                 EditorGUILayout.EndHorizontal();
                                 EditorGUI.indentLevel = 2;
                                 EditorGUILayout.BeginHorizontal();

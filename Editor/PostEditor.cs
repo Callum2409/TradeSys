@@ -25,6 +25,8 @@ namespace CallumP.TradeSys
         private SerializedObject postSO;
         private TradePost postNormal;
         private SerializedProperty stock;
+        private SerializedProperty currencies;
+        private SerializedProperty exchanges;
         private SerializedProperty controllerGoods;
         private SerializedProperty manufacturing;
         private SerializedProperty controllerMan;
@@ -51,6 +53,8 @@ namespace CallumP.TradeSys
 
             stock = postSO.FindProperty("stock");
             controllerGoods = controllerSO.FindProperty("goods");
+            currencies = postSO.FindProperty("currencies");
+            exchanges = postSO.FindProperty("exchanges");
             manufacturing = postSO.FindProperty("manufacture");
             controllerMan = controllerSO.FindProperty("manufacture");
             customPricing = postSO.FindProperty("customPricing");
@@ -83,6 +87,7 @@ namespace CallumP.TradeSys
 
             sel = GUITools.Toolbar(sel, new string[] {
                                 "Settings",
+                                "Currencies",
                                 "Stock",
                                 "Manufacturing"
                         });//show a toolbar
@@ -121,8 +126,46 @@ namespace CallumP.TradeSys
                     break;
                 #endregion
 
-                #region stock
+                #region currencies
                 case 1:
+                    controllerNormal.selected.PC = GUITools.Toolbar(controllerNormal.selected.PC, new string[] { "Currencies", "Exchange" });
+                    int cur = controllerNormal.selected.PC;
+
+                    GUITools.HorizVertOptions(controllerSO.FindProperty("showHoriz"));//show a horiz vert option
+
+                    EditorGUILayout.BeginHorizontal();//show a select all/none button for both the currencies and exchanges
+
+                    if (cur == 0)
+                        EditorGUILayout.LabelField(new GUIContent("Enable currencies", "Allow trade post to use currencies. If currency disabled that an item is set to use, will not be available for trade"));
+                    else
+                        EditorGUILayout.LabelField(new GUIContent("Enable exchanges", "Allow trade post to have exchanges. Exchange cannot be enabled if the currency is not enabled"));
+
+                    GUITools.EnableDisable(cur == 0 ? currencies : exchanges, "", false);
+
+                    GUITools.GetCurrencyNames(controllerNormal);//update the currency names
+
+                    scrollPos.PC = GUITools.StartScroll(scrollPos.PC, smallScroll);
+
+                    List<CurrencyExchange> curEx = controllerNormal.currencyExchange;//get the currency exchanges
+                    List<bool> curNorm = postNormal.currencies;//get the currencies in the normal post
+
+                    string[] currencyNames = controllerNormal.currencyNames;
+                    string[] exchangeNames = new string[curEx.Count];//create an array for the exchange names
+                    for (int n = 0; n < exchangeNames.Length; n++)
+                    {//go through all exchanges
+                        CurrencyExchange thisEx = curEx[n];
+                        exchangeNames[n] = string.Format("{0} {1} {2}", currencyNames[thisEx.IDA], thisEx.reverse ? "\u2194" : "\u2192", currencyNames[thisEx.IDB]);//create the name of the exchange to display
+
+                        if (!curNorm[thisEx.IDA] || !curNorm[thisEx.IDB])//if one of the exchanges has the currency disabled, dont allow it to be selected
+                            exchanges.GetArrayElementAtIndex(n).boolValue = false;
+                    }//end for all exchanges
+
+                    GUITools.HorizVertDisplay(cur == 0 ? currencyNames : exchangeNames, cur == 0 ? currencies : exchanges, controllerSO.FindProperty("showHoriz").boolValue);
+                    break;
+                #endregion
+
+                #region stock
+                case 2:
                     EditorGUI.indentLevel = 0;
                     EditorGUILayout.BeginHorizontal();
                     EditorGUILayout.LabelField("Stock information", EditorStyles.boldLabel);
@@ -313,12 +356,19 @@ namespace CallumP.TradeSys
                                      //use the enabled or disabled selection to find what has changed
                                      //this is so that if the hidden option is pressed, buy and sell are disabled
                                      //but if buy or sell are pressed, then hidden becomes disabled
-                                        if ((stockGroup.GetArrayElementAtIndex(s).FindPropertyRelative("buy").boolValue && !before[s][0]) || (stockGroup.GetArrayElementAtIndex(s).FindPropertyRelative("sell").boolValue && !before[s][1]))
-                                            //if buy or sell have just been enabled
-                                            stockGroup.GetArrayElementAtIndex(s).FindPropertyRelative("hidden").boolValue = false;
-                                        if (stockGroup.GetArrayElementAtIndex(s).FindPropertyRelative("hidden").boolValue && !before[s][2])
-                                            //if hidden has been enabled
-                                            stockGroup.GetArrayElementAtIndex(s).FindPropertyRelative("buy").boolValue = stockGroup.GetArrayElementAtIndex(s).FindPropertyRelative("sell").boolValue = false;
+                                     //also needs to check that can trade as currency has been selected
+
+                                        if (postNormal.currencies[controllerNormal.goods[g].goods[s].currencyID])
+                                        {//if currency enabled
+                                            if ((stockGroup.GetArrayElementAtIndex(s).FindPropertyRelative("buy").boolValue && !before[s][0]) || (stockGroup.GetArrayElementAtIndex(s).FindPropertyRelative("sell").boolValue && !before[s][1]))
+                                                //if buy or sell have just been enabled
+                                                stockGroup.GetArrayElementAtIndex(s).FindPropertyRelative("hidden").boolValue = false;
+                                            if (stockGroup.GetArrayElementAtIndex(s).FindPropertyRelative("hidden").boolValue && !before[s][2])
+                                                //if hidden has been enabled
+                                                stockGroup.GetArrayElementAtIndex(s).FindPropertyRelative("buy").boolValue = stockGroup.GetArrayElementAtIndex(s).FindPropertyRelative("sell").boolValue = false;
+                                        }//end if currency enabled
+                                        else  //else need to make false
+                                            stockGroup.GetArrayElementAtIndex(s).FindPropertyRelative("buy").boolValue = stockGroup.GetArrayElementAtIndex(s).FindPropertyRelative("sell").boolValue = stockGroup.GetArrayElementAtIndex(s).FindPropertyRelative("hidden").boolValue = false;
                                     }//end for all items
                                 }//end if group open
                                 EditorGUI.indentLevel = 0;
@@ -332,7 +382,7 @@ namespace CallumP.TradeSys
                 #endregion
 
                 #region manufacturing
-                case 2:
+                case 3:
                     scrollPos.PM = GUITools.PTMan(manufacturing, scrollPos.PM, smallScroll, controllerMan, controllerNormal, postSO, true);
                     break;
                     #endregion

@@ -16,8 +16,9 @@ namespace CallumP.TradeSys
         #region variables
         public List<StockGroup> stock = new List<StockGroup>();//the stock list
         public List<MnfctrGroup> manufacture = new List<MnfctrGroup>();//manufacturing lists
+        public List<bool> currencies = new List<bool>();//currency lists
+        public List<bool> exchanges = new List<bool>();//exchange lists
         public float cash = 10000;//the cash that the trade post has, so can buy and sell items
-        public float[] cashNew;//the different numbers of each currency held at the post
         public bool convertCurrency;//whether trade post can make currency conversions
         public bool stopProcesses;//if selected, and the number of an item is more or less than the max / min, then any process requiring the item will stop
 

@@ -21,6 +21,7 @@ namespace CallumP.TradeSys
         public string[][] allNames;//an array for each group with an array of the names
         public string[][] manufactureNames;//an array with the names of each manufacturing process
         public string[][] manufactureTooltips;//an array of strings with the tooltip for the manufacturng processes
+        public string[] currencyNames;//the names of the currencies
 #endif
 
         #region used variables
@@ -380,6 +381,20 @@ namespace CallumP.TradeSys
 
         public void SortTradePost(TradePost thisPost)
         {//sort out the trade post so shows correct items
+            #region sort currencies
+            while (thisPost.currencies.Count < currencies.Count)//if not enough currencies
+                thisPost.currencies.Add(true);
+            if (thisPost.currencies.Count > currencies.Count)//if too many currencies
+                thisPost.currencies.RemoveRange(currencies.Count, thisPost.currencies.Count - currencies.Count);
+            #endregion
+
+            #region sort exchanges
+            while (thisPost.exchanges.Count < currencyExchange.Count)//if not enough currencyExchange
+                thisPost.exchanges.Add(true);
+            if (thisPost.exchanges.Count > currencyExchange.Count)//if too many currencyExchange
+                thisPost.exchanges.RemoveRange(currencyExchange.Count, thisPost.exchanges.Count - currencyExchange.Count);
+            #endregion
+
             #region sort goods
             while (thisPost.stock.Count < goods.Count)//while not enough groups
                 thisPost.stock.Add(new StockGroup { });
