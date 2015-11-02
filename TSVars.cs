@@ -27,7 +27,8 @@ namespace CallumP.TradeSys
             GG, //goods group
             MG,//manufacture group
             CC,//currency tab in controller
-            PC;//currency tab in post
+            PC,//currency tab in post
+            TC;//currency tab in trader
     }
 
     [System.Serializable]
@@ -45,6 +46,7 @@ namespace CallumP.TradeSys
                 PG, //post goods
                 PM, //post manufacturing
                 TS, //trader settings
+                TC, //trader currencies
                 TG, //trader goods
                 TM, //trader manufacturing
                 SS, //spawner settings
@@ -259,7 +261,7 @@ namespace CallumP.TradeSys
     [System.Serializable]
     public class CurrencyExchange
     { //exchange rates of currencies
-        public float numberA, numberB;//number of currency A & B
+        public float numberA, numberB, multiplier;//number of currency A & B, the multiplier to go from A -> B
         public int IDA, IDB;//currency IDs of A and B
         public bool reverse;//if able to convert both ways with rates provided
     }

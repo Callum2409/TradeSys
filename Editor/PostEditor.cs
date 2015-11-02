@@ -106,10 +106,7 @@ namespace CallumP.TradeSys
 
                         if (!expendable)
                         {//show pricing things if not expendable
-                            EditorGUILayout.BeginHorizontal();
                             EditorGUILayout.PropertyField(customPricing, new GUIContent("Custom pricing", "Manually set the pricing of each item. Prices will be static"));
-                            EditorGUILayout.PropertyField(cash, new GUIContent("Credits", "This is the amout of money that the trade post has in order to buy and sell items"));
-                            EditorGUILayout.EndHorizontal();
                         }
                         else//end if no pricing
                             postNormal.customPricing = false;//set to false so wont display custom pricing
@@ -128,7 +125,7 @@ namespace CallumP.TradeSys
 
                 #region currencies
                 case 1:
-                    controllerNormal.selected.PC = GUITools.Toolbar(controllerNormal.selected.PC, new string[] { "Currencies", "Exchange" });
+                    /*controllerNormal.selected.PC = GUITools.Toolbar(controllerNormal.selected.PC, new string[] { "Currencies", "Exchange" });
                     int cur = controllerNormal.selected.PC;
 
                     GUITools.HorizVertOptions(controllerSO.FindProperty("showHoriz"));//show a horiz vert option
@@ -160,7 +157,9 @@ namespace CallumP.TradeSys
                             exchanges.GetArrayElementAtIndex(n).boolValue = false;
                     }//end for all exchanges
 
-                    GUITools.HorizVertDisplay(cur == 0 ? currencyNames : exchangeNames, cur == 0 ? currencies : exchanges, controllerSO.FindProperty("showHoriz").boolValue);
+                    GUITools.HorizVertDisplay(cur == 0 ? currencyNames : exchangeNames, cur == 0 ? currencies : exchanges, controllerSO.FindProperty("showHoriz").boolValue);*/
+
+                    scrollPos.PC = GUITools.PTCur(true, controllerNormal, controllerSO, scrollPos.PC, currencies, exchanges);
                     break;
                 #endregion
 
@@ -358,7 +357,7 @@ namespace CallumP.TradeSys
                                      //but if buy or sell are pressed, then hidden becomes disabled
                                      //also needs to check that can trade as currency has been selected
 
-                                        if (postNormal.currencies[controllerNormal.goods[g].goods[s].currencyID])
+                                        if (postNormal.currencies[controllerNormal.goods[g].goods[s].currencyID] != -1)
                                         {//if currency enabled
                                             if ((stockGroup.GetArrayElementAtIndex(s).FindPropertyRelative("buy").boolValue && !before[s][0]) || (stockGroup.GetArrayElementAtIndex(s).FindPropertyRelative("sell").boolValue && !before[s][1]))
                                                 //if buy or sell have just been enabled

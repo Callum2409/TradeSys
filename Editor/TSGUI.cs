@@ -522,5 +522,58 @@ namespace CallumP.TradeSys
         { //get the names of all of the currencies
             controller.currencyNames = controller.currencies.Select(c => c.plural).ToArray<string>(); ;//get an array of all of the currency names
         }//end GetCurrencyNames
+
+        public Vector2 PTCur(bool TP, Controller controller, SerializedObject controllerSO, Vector2 scrollPos, SerializedProperty currencies, SerializedProperty exchanges) { //show the currency tab for the trade post and trader
+
+            SerializedProperty selected = controllerSO.FindProperty("selected").FindPropertyRelative(TP?"PC":"TC");//get the currency toolbar selected option
+            int sel = selected.intValue;
+            
+           selected.intValue = Toolbar(selected.intValue, new string[] { "Currencies", "Exchange" });
+
+            HorizVertOptions(controllerSO.FindProperty("showHoriz"));//show a horiz vert option
+
+            EditorGUILayout.BeginHorizontal();//show a select all/none button for both the currencies and exchanges
+
+            if (sel == 0)
+            {
+                EditorGUILayout.LabelField(new GUIContent("Enable currencies", "Allow trade post to use currencies. Set the number to be -1 to disable the curency from being used. If currency disabled that an item is set to use, will not be available for trade"));
+                EditorGUILayout.EndHorizontal();
+            }
+            else
+            {
+                EditorGUILayout.LabelField(new GUIContent("Enable exchanges", "Allow trade post to have exchanges. Exchange cannot be enabled if the currency is not enabled"));
+                EnableDisable(exchanges, "", false);
+            }
+
+           GetCurrencyNames(controller);//update the currency names
+            
+           scrollPos = StartScroll(scrollPos, controllerSO.FindProperty("smallScroll"));
+
+            List<CurrencyExchange> curEx = controller.currencyExchange;//get the currency exchanges
+
+            string[] currencyNames = controller.currencyNames;
+            string[] exchangeNames = new string[curEx.Count];//create an array for the exchange names
+            for (int n = 0; n < exchangeNames.Length; n++)
+            {//go through all exchanges
+                CurrencyExchange thisEx = curEx[n];
+                exchangeNames[n] = string.Format("{0} {1} {2}", currencyNames[thisEx.IDA], thisEx.reverse ? "\u2194" : "\u2192", currencyNames[thisEx.IDB]);//create the name of the exchange to display
+
+                if (currencies.GetArrayElementAtIndex(thisEx.IDA).floatValue ==-1 || currencies.GetArrayElementAtIndex(thisEx.IDB).floatValue == -1)//if one of the exchanges has the currency disabled, dont allow it to be selected
+                    exchanges.GetArrayElementAtIndex(n).boolValue = false;
+            }//end for all exchanges
+
+           HorizVertDisplay(sel == 0 ? currencyNames : exchangeNames, sel == 0 ? currencies : exchanges, controllerSO.FindProperty("showHoriz").boolValue);//show the items
+
+            if(sel == 0) { //if is currencies
+                for(int c = 0; c<currencies.arraySize; c++) { //for all currencies
+                    SerializedProperty thisCurrency = currencies.GetArrayElementAtIndex(c);
+                    if (thisCurrency.floatValue < 0 && thisCurrency.floatValue != -1)//if between 0 and -1
+                        thisCurrency.floatValue = -1;//set to be -1
+
+                    thisCurrency.floatValue = (float)System.Math.Round(thisCurrency.floatValue, controller.currencies[c].decimals, System.MidpointRounding.AwayFromZero);//set the decimals correctly
+                }//end for currencies
+            }//end if currencies
+            return scrollPos;
+        }//end PTCur
     }//end TSGUI
 }//end namespace

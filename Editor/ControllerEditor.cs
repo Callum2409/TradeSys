@@ -701,10 +701,20 @@ namespace CallumP.TradeSys
 
                                 EditorGUILayout.BeginHorizontal();
                                 EditorGUILayout.PropertyField(curEx.FindPropertyRelative("numberA"), GUIContent.none);
+
+                                EditorGUILayout.BeginVertical();
+                                GUILayout.Space(1f);
                                 curEx.FindPropertyRelative("IDA").intValue = EditorGUILayout.Popup("", curEx.FindPropertyRelative("IDA").intValue, controllerNormal.currencyNames, "DropDownButton");
+                                EditorGUILayout.EndVertical();
+
                                 EditorGUILayout.LabelField(curEx.FindPropertyRelative("reverse").boolValue ? "\u2194" : "\u2192");
                                 EditorGUILayout.PropertyField(curEx.FindPropertyRelative("numberB"), GUIContent.none);
+
+                                EditorGUILayout.BeginVertical();
+                                GUILayout.Space(1f);
                                 curEx.FindPropertyRelative("IDB").intValue = EditorGUILayout.Popup("", curEx.FindPropertyRelative("IDB").intValue, controllerNormal.currencyNames, "DropDownButton");
+                                EditorGUILayout.EndVertical();
+
                                 EditorGUILayout.PropertyField(curEx.FindPropertyRelative("reverse"), new GUIContent("", "Allow the exchange to operate in reverse"), GUILayout.Width(15f));
 
                                 if(GUITools.PlusMinus(false))
@@ -724,11 +734,9 @@ namespace CallumP.TradeSys
                                 if (b <= 0)
                                     b = 1;
 
-                                a = (float)System.Math.Round(a, controllerNormal.currencies[curEx.FindPropertyRelative("IDA").intValue].decimals, System.MidpointRounding.AwayFromZero);
-                                b = (float)System.Math.Round(b, controllerNormal.currencies[curEx.FindPropertyRelative("IDB").intValue].decimals, System.MidpointRounding.AwayFromZero);
-
                                 curEx.FindPropertyRelative("numberA").floatValue = a;
                                 curEx.FindPropertyRelative("numberB").floatValue = b;
+                                curEx.FindPropertyRelative("multiplier").floatValue = b / a;
 
                             }//end for all exchanges
                             break;

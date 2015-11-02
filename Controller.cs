@@ -383,7 +383,7 @@ namespace CallumP.TradeSys
         {//sort out the trade post so shows correct items
             #region sort currencies
             while (thisPost.currencies.Count < currencies.Count)//if not enough currencies
-                thisPost.currencies.Add(true);
+                thisPost.currencies.Add(0);
             if (thisPost.currencies.Count > currencies.Count)//if too many currencies
                 thisPost.currencies.RemoveRange(currencies.Count, thisPost.currencies.Count - currencies.Count);
             #endregion
@@ -439,6 +439,20 @@ namespace CallumP.TradeSys
 
         public void SortTrader(Trader thisTrader)
         {//sort out the trader so shows correct items
+            #region sort currencies
+            while (thisTrader.currencies.Count < currencies.Count)//if not enough currencies
+                thisTrader.currencies.Add(0);
+            if (thisTrader.currencies.Count > currencies.Count)//if too many currencies
+                thisTrader.currencies.RemoveRange(currencies.Count, thisTrader.currencies.Count - currencies.Count);
+            #endregion
+
+            #region sort exchanges
+            while (thisTrader.exchanges.Count < currencyExchange.Count)//if not enough currencyExchange
+                thisTrader.exchanges.Add(true);
+            if (thisTrader.exchanges.Count > currencyExchange.Count)//if too many currencyExchange
+                thisTrader.exchanges.RemoveRange(currencyExchange.Count, thisTrader.exchanges.Count - currencyExchange.Count);
+            #endregion
+
             #region sort goods
             while (thisTrader.items.Count < goods.Count)//while not enough groups
                 thisTrader.items.Add(new ItemGroup { });
@@ -1189,5 +1203,27 @@ namespace CallumP.TradeSys
             { }
             return "Formatting not valid!";
         }//end GetPriceFormatted
+
+        public float GetExchangeRate(int IDA, int IDB)
+        { //return the exchange mupltiplier between the two given currency IDs
+            //will return 0 if the exchange is not allowed
+
+            if (IDA == IDB)//if is the same currency as want to covnert to
+                return 1;//return 1 as no exchange is required
+
+            for (int e = 0; e < currencyExchange.Count; e++)
+            { //go through all exchanges
+                CurrencyExchange cEx = currencyExchange[e];
+
+                if (cEx.IDA == IDA && cEx.IDB == IDB)//if is simple A -> B
+                    return cEx.multiplier;//return the multuplier
+
+                if(cEx.IDA == IDB && cEx.IDB == IDA && cEx.reverse)//if reverse is allowed
+                    return 1/cEx.multiplier;//return 1/ to get correct rate
+            }//end for all exchanges
+
+            //if not returned a value, return 0 as is not allowed
+            return 0;
+        }//end GetExchangeRate
     }//end Controller
 }//end namespace

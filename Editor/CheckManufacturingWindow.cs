@@ -25,6 +25,9 @@ namespace CallumP.TradeSys
 
         void OnGUI()
         {
+            EditorGUIUtility.fieldWidth = 0;
+            EditorGUIUtility.labelWidth = 0;
+
             CalcInfo();//calculate all of the required info
 
             EditorGUILayout.BeginHorizontal();
@@ -110,36 +113,37 @@ namespace CallumP.TradeSys
 
             List<MnfctrTypes> manufacture = controller.manufacture;
 
-            for (int m1 = 0; m1 < manufacture.Count; m1++)
+            for (int m = 0; m < manufacture.Count; m++)
             {//go through all manufacture groups
-                int processCount = manufacture[m1].manufacture.Count;
-                pricing[m1] = new string[processCount];
+                int processCount = manufacture[m].manufacture.Count;
+                pricing[m] = new string[processCount];
 
-                for (int m2 = 0; m2 < processCount; m2++)
+                for (int p = 0; p < processCount; p++)
                 {//go through all processes					
                     #region number change
-                    Mnfctr cMan = controller.manufacture[m1].manufacture[m2];
-                    for (int p = 0; p < controller.postScripts.Length; p++)//go through all posts
-                        if (controller.postScripts[p].manufacture[m1].enabled)//only count if group enabled
-                            NumberChange(controller.postScripts[p].manufacture[m1].manufacture[m2], cMan);
+                    Mnfctr cMan = controller.manufacture[m].manufacture[p];
+                    for (int tp = 0; tp < controller.postScripts.Length; tp++)//go through all posts
+                        if (controller.postScripts[tp].manufacture[m].enabled)//only count if group enabled
+                            NumberChange(controller.postScripts[tp].manufacture[m].manufacture[p], cMan);
                     for (int t = 0; t < controller.traderScripts.Length; t++)//go through all traders
-                        if (controller.traderScripts[t].manufacture[m1].enabled)//only count if group enabled
-                            NumberChange(controller.traderScripts[t].manufacture[m1].manufacture[m2], cMan);
+                        if (controller.traderScripts[t].manufacture[m].enabled)//only count if group enabled
+                            NumberChange(controller.traderScripts[t].manufacture[m].manufacture[p], cMan);
                     #endregion
 
                     #region pricing
-                    float profit = 0;
-                    for (int nm = 0; nm < cMan.needing.Count; nm++)
-                    {//go through all needing, getting min cost
-                        NeedMake currentNM = cMan.needing[nm];
-                        profit -= controller.goods[currentNM.groupID].goods[currentNM.itemID].minPrice * currentNM.number;
-                    }//end for needing
-                    for (int nm = 0; nm < cMan.making.Count; nm++)
-                    {//go through all making, getting max price
-                        NeedMake currentNM = cMan.making[nm];
-                        profit += controller.goods[currentNM.groupID].goods[currentNM.itemID].maxPrice * currentNM.number;
-                    }//end for needing
-                    pricing[m1][m2] = profit.ToString();
+                    pricing[m][p] = "N/A";
+
+                    for (int c = 0; c < controller.currencies.Count; c++)
+                    { //for all currencies
+
+                        float percent = Exchange(c, cMan);//get the percent value
+
+                        if (percent != 0)
+                        {//if is a value
+                            pricing[m][p] = percent.ToString("n2") + "%";//can set the text
+                            break;//and can break as valid excahanges were used
+                        }//end if usable
+                    }//end for currencies
                     #endregion
                 }//end for all processes			
             }//end for manufacture groups
@@ -182,6 +186,42 @@ namespace CallumP.TradeSys
                 return "Decrease (" + Mathf.Abs(change).ToString("f2") + ")";
             return "Same";
         }//end SetChange
+
+        float Exchange(int currencyID, Mnfctr cMan)
+        {//go through nm and see if exchange is ok, if is then add to total, if not, return
+
+            float needing = 0;//the cost of all of the items needed
+            float making = 0;//the profit from all of the items sold
+
+            for (int nm = 0; nm < cMan.needing.Count; nm++)
+            {//go through all needing, getting min cost
+                NeedMake currentNM = cMan.needing[nm];
+
+                Goods currentGood = controller.goods[currentNM.groupID].goods[currentNM.itemID];
+
+                float thisNeeding = currentGood.minPrice * currentNM.number * controller.GetExchangeRate(currentGood.currencyID, currencyID);
+
+                if (thisNeeding != 0)//if is a value
+                    needing += thisNeeding;//then add to the needing
+                else
+                    return 0;//else return 0 as currency is invalid
+            }//end for needing
+            for (int nm = 0; nm < cMan.making.Count; nm++)
+            {//go through all making, getting max price
+                NeedMake currentNM = cMan.making[nm];
+
+                Goods currentGood = controller.goods[currentNM.groupID].goods[currentNM.itemID];
+
+                float thisMaking = currentGood.maxPrice * currentNM.number * controller.GetExchangeRate(currentGood.currencyID, currencyID);
+
+                if (thisMaking != 0)//if is a value
+                    making += thisMaking;//then add to the making
+                else
+                    return 0;//else return 0 as currency is invalid
+            }//end for needing
+
+            return ((making / needing) - 1) * 100;//return the percent profit
+        }//end CurrencyExchange
 
     }//end CheckManufacturingWindow
 }//end namespace

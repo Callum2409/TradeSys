@@ -29,6 +29,8 @@ namespace CallumP.TradeSys
         private SerializedProperty closeDistance;
         private SerializedProperty collect;
         private SerializedProperty item;
+        private SerializedProperty currencies;
+        private SerializedProperty exchanges;
         private SerializedProperty manufacturing;
         private SerializedProperty dropCargo;
         private SerializedProperty dropSingle;
@@ -55,6 +57,9 @@ namespace CallumP.TradeSys
             cash = traderSO.FindProperty("cash");
             closeDistance = traderSO.FindProperty("closeDistance");
             collect = traderSO.FindProperty("allowCollect");
+
+            currencies = traderSO.FindProperty("currencies");
+            exchanges = traderSO.FindProperty("exchanges");
 
             posts = GameObject.FindGameObjectsWithTag(Tags.TP);
 
@@ -84,6 +89,7 @@ namespace CallumP.TradeSys
 
             sel = GUITools.Toolbar(sel, new string[] {
                                         "Settings",
+                                        "Currencies",
                                         "Items",
                                         "Manufacturing"
                                 });//show a toolbar
@@ -195,14 +201,20 @@ namespace CallumP.TradeSys
                     break;
                 #endregion
 
-                #region items
+                #region currencies
                 case 1:
+                    scrollPos.PC = GUITools.PTCur(true, controllerNormal, controllerSO, scrollPos.TC, currencies, exchanges);
+                    break;
+                #endregion
+
+                #region items
+                case 2:
                     scrollPos.TG = GUITools.EnableDisableItems("Allow item trade", "expandedT", scrollPos.TG, controllerSO, traderSO.FindProperty("items"), smallScroll, controllerNormal);
                     break;
                 #endregion
 
                 #region manufacturing
-                case 2:
+                case 3:
                     scrollPos.TM = GUITools.PTMan(manufacturing, scrollPos.TM, smallScroll, controllerSO.FindProperty("manufacture"), controllerNormal, traderSO, false);
                     break;
                     #endregion
