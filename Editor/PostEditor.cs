@@ -30,7 +30,7 @@ namespace CallumP.TradeSys
         private SerializedProperty controllerGoods;
         private SerializedProperty manufacturing;
         private SerializedProperty controllerMan;
-        private SerializedProperty customPricing, cash;
+        private SerializedProperty customPricing;
         private SerializedProperty stopProcesses;
         private SerializedProperty allowTrades, allowMan;
         bool expendable;
@@ -58,7 +58,6 @@ namespace CallumP.TradeSys
             manufacturing = postSO.FindProperty("manufacture");
             controllerMan = controllerSO.FindProperty("manufacture");
             customPricing = postSO.FindProperty("customPricing");
-            cash = postSO.FindProperty("cash");
 
             stopProcesses = postSO.FindProperty("stopProcesses");
             allowTrades = postSO.FindProperty("allowTrades");

@@ -135,14 +135,14 @@ I hope this is useful in creating your GUI!
 								if (enabled.Count < 3)//if doesnt have post tags
 										ShowShop ();
 								else {//else can show the selected window				
-										if (enabled [0])
-												EstateAgent ();
-										else if (enabled [1])
-												ShowPurchasable ();
-										else if (enabled [2])
-												ShowOwned ();
-										else
-												ShowShop ();
+                    if (enabled[0]) { }
+                    //EstateAgent ();
+                    else if (enabled[1])
+                    { }// ShowPurchasable();
+                    else if (enabled[2])
+                        ShowOwned();
+                    else
+                        ShowShop();
 								}//end else show options
 				
 						} else {//else show message that they are not allowing trading
@@ -152,7 +152,7 @@ I hope this is useful in creating your GUI!
 				GUI.Label (new Rect (10, Screen.height - 50, 500, 30), pickup);//display that item was collected
 		}//end OnGUI()
 	
-		void EstateAgent ()
+		/*void EstateAgent ()
 		{//show the buy trade post screen
 				GUI.Label (new Rect (10, 50, 250, 80), "Cash: " + cash);//show the player cash
 		
@@ -167,7 +167,7 @@ I hope this is useful in creating your GUI!
 				
 				for (int p = 0; p<purchasable.Count; p++) {//go through all purchasable posts
 						GUI.Label (new Rect (10, p * 30, 100, 30), purchasable [p].name);//show the name of the group
-						GUI.Label (new Rect (120, p * 30, 200, 30), "Price: " + purchasable [p].cash);//show how much it is to purchase the trade post. uses the cash the trade post has for the price
+						GUI.Label (new Rect (120, p * 30, 200, 30), "Price: " + purchasable [p].currencies[);//show how much it is to purchase the trade post. uses the cash the trade post has for the price
 			
 						if (GUI.Button (new Rect (330, p * 30, 100, 30), "Purchase") && cash >= purchasable [p].cash) {//purchase the trade post if has enough cash
 								cash -= purchasable [p].cash;//pay for the trade post
@@ -193,7 +193,7 @@ I hope this is useful in creating your GUI!
 		{//show info that the trade post is for sale
 				GUI.Label (new Rect (Screen.width / 2 - 200, Screen.height / 2 - 75, 400, 150), "This trade post is for sale. " +
 						"Visit the estate agents (magenta trade post) to purchase this trade post for " + nearPost.cash);
-		}//end ShowPurchasable
+		}//end ShowPurchasable*/
 		
 		void ShowOwned ()
 		{//example GUI for an owned post
@@ -256,13 +256,6 @@ I hope this is useful in creating your GUI!
 				GUI.Label (new Rect (10, 50, 250, 80), "Cash: " + cash + "\nSpace remaining: " + spaceRemaining.ToString ("F2") + unitLabel);
 				//a label showing the cash that the player has and the space remaining plus the maximum unit
 		
-				GUI.skin.label.alignment = TextAnchor.UpperRight;//set anchor to right for post cash
-		
-				GUI.Label (new Rect (Screen.width - 210, 50, 200, 30), "Post Cash: " + nearPost.cash);//show how much cash the trade post has because it is not able
-				//to continue to make trades if it does not have sufficient cash
-		
-				GUI.skin.label.alignment = TextAnchor.UpperLeft;//set anchor back to left
-		
 				selected = GUI.Toolbar (new Rect (Screen.width - 200, 10, 130, 30), selected, new string[] {
 						"Buy",
 						"Sell"
@@ -301,16 +294,16 @@ I hope this is useful in creating your GUI!
 														if (selected == 0) {//if is buy mode
 																if (cash >= itemCost && spaceRemaining >= cG.mass && pS.number > 0) {//check if valid purchase
 																		pS.number--;//remove from trade post
-																		nearPost.cash += itemCost;//pay trade post cash
+																		nearPost.currencies[cG.currencyID] += itemCost;//pay trade post cash
 																		cash -= itemCost;//withdraw cash from trader
 																		spaceRemaining -= cG.mass;//remove cargo space
 									
 																		cargo [g] [i]++;//add to the cargo being carried
 																}//end purchase validity check
 														} else {//else sell mode
-																if (nearPost.cash >= itemCost && cargo [g] [i] > 0) {//check if valid sale
+																if (nearPost.currencies[cG.currencyID] >= itemCost && cargo [g] [i] > 0) {//check if valid sale
 																		pS.number++;//add to trade post
-																		nearPost.cash -= itemCost;//withdraw cash from trade post
+																		nearPost.currencies[cG.currencyID] -= itemCost;//withdraw cash from trade post
 																		cash += itemCost;//receive cash
 																		spaceRemaining += cG.mass;//add space back
 									

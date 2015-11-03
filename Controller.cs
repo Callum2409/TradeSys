@@ -612,12 +612,13 @@ namespace CallumP.TradeSys
                     double mass = cGood.mass;//the mass of the good
                     Stock stock = post.stock[cTrade.groupID].stock[cTrade.itemID];//the stock
                     float price = stock.price;//the price of the item
+                    int cID = cGood.currencyID;//the currency ID for the item
 
                     //need to check quantity again because are loading more than one type of item, and quantity was based on full loads
                     int quantity = Mathf.Min((int)System.Math.Floor(trader.spaceRemaining / mass), cTrade.quantity);
 
                     if (!expTraders.enabled)//if not expendable, also check the prices for min quantity
-                        quantity = Mathf.Min(quantity, Mathf.FloorToInt(trader.cash / price));//check the price one here as is not expendable
+                        quantity = Mathf.Min(quantity, Mathf.FloorToInt(trader.currencies[cID] / price));//check the price one here as is not expendable
 
                     if (quantity > 0)
                     {//check that adding cargo														
@@ -627,15 +628,15 @@ namespace CallumP.TradeSys
 
                         for (int q = 0; q < quantity; q++)
                         {//add the quantity individually
-                            if (trader.cash >= price || expTraders.enabled)
+                            if (trader.currencies[cID] >= price || expTraders.enabled)
                             {
                                 //make sure that the trader can afford to buy more items or is expendable so doesnt matter
                                 stock.number--;//remove single item of stock
 
                                 if (!expTraders.enabled)
                                 {//only sort cash if not expendable
-                                    trader.cash -= price;//pay for the items
-                                    post.cash += price;//give the money to the trade post
+                                    trader.currencies[cID] -= price;//pay for the items
+                                    post.currencies[cID] += price;//give the money to the trade post
                                     if (priceUpdates)//if updating the price after each item
                                         post.UpdateSinglePrice(cTrade.groupID, cTrade.itemID);
                                 }//end if not expendable, sort cash
@@ -896,6 +897,7 @@ namespace CallumP.TradeSys
          //work out the quantity that should be traded
             Goods good = goods[gID].goods[iID];
             float avg = (float)good.average;
+            int cID = good.currencyID;
             Stock cP = postScripts[c].stock[gID].stock[iID];//the stock at the current post
             int sellQuantity = cP.number - Mathf.RoundToInt(avg * sellMultiple);
             int buyQuantity = Mathf.RoundToInt(avg - (postScripts[t].stock[gID].stock[iID].number * buyMultiple));
@@ -903,7 +905,7 @@ namespace CallumP.TradeSys
             //and the number that the trader can purchase, and the number that the trade post can purchase
             int quantity = (int)Mathf.Min(sellQuantity, buyQuantity, (float)(trader.spaceRemaining / good.mass));
             if (!expTraders.enabled)//if expendable, do more calculations
-                quantity = (int)Mathf.Min(quantity, Mathf.FloorToInt(trader.cash / cP.price), Mathf.FloorToInt(postScripts[t].cash / (postScripts[t].stock[gID].stock[iID].price * purchasePercent)));
+                quantity = (int)Mathf.Min(quantity, Mathf.FloorToInt(trader.currencies[cID] / cP.price), Mathf.FloorToInt(postScripts[t].currencies[cID] / (postScripts[t].stock[gID].stock[iID].price * purchasePercent)));
             return quantity;
         }//end TradeQuantity
 

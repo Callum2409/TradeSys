@@ -18,7 +18,6 @@ namespace CallumP.TradeSys
         public List<MnfctrGroup> manufacture = new List<MnfctrGroup>();//manufacturing lists
         public List<float> currencies = new List<float>();//currency lists
         public List<bool> exchanges = new List<bool>();//exchange lists
-        public float cash = 10000;//the cash that the trade post has, so can buy and sell items
         public bool convertCurrency;//whether trade post can make currency conversions
         public bool stopProcesses;//if selected, and the number of an item is more or less than the max / min, then any process requiring the item will stop
 
@@ -78,7 +77,7 @@ namespace CallumP.TradeSys
                     for (int m2 = 0; m2 < manufacture[m1].manufacture.Count; m2++)
                     {//go through manufacture processes
                         RunMnfctr cMan = manufacture[m1].manufacture[m2];
-                        if (cMan.enabled && !cMan.running && cash - cMan.price > 0)
+                        if (cMan.enabled && !cMan.running && currencies[cMan.currencyID] - cMan.price > 0)
                         {
                             //check that the process is allowed and not currently running and has enough cash
                             if (ResourceCheck(m1, m2))
@@ -121,7 +120,7 @@ namespace CallumP.TradeSys
             Mnfctr process = controller.manufacture[groupID].manufacture[processID];//the manufacturing process in the controller
             RunMnfctr postMan = manufacture[groupID].manufacture[processID];//the manufacturing process at the trade post
 
-            cash -= postMan.price * (controller.expTraders.enabled ? 0 : 1);//remove the amount of money required to run the process
+            currencies[postMan.currencyID] -= postMan.price * (controller.expTraders.enabled ? 0 : 1);//remove the amount of money required to run the process
                                                                             //only need to remove credits if expendable is disabled
 
             postMan.running = true;//set to true so cannot be called again until done

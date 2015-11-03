@@ -129,7 +129,8 @@ namespace CallumP.TradeSys
     public class RunMnfctr
     {//the manufacturing process information for each trade post and trader
         public bool enabled;
-        public int create, cooldown, price;
+        public int create, cooldown, currencyID;
+        public float price;
         internal bool running;
     }
 

@@ -16,7 +16,6 @@ namespace CallumP.TradeSys
         internal bool onCall;//true if the trader has been given a destination post
         internal bool allowGo = false;//whether the trader is allowed to move or not
         public bool allowCollect;//whether the trader is allowed to collect dropped items
-        public float cash = 1000;//the amount of money that the trader has to buy items with
         public double cargoSpace = 10, spaceRemaining;//the cargo space of the trader, and how much is left
         public float closeDistance = 1.5f;//how far away the trader needs to be from the trade post before it registers as being there
         public float stopTime;//how long the trader needs to stop for
@@ -66,7 +65,7 @@ namespace CallumP.TradeSys
                         while (number > 0)
                         {//if has more than 0 
                             int cost = Mathf.RoundToInt(stock.price * controller.purchasePercent);
-                            if (finalPost.cash >= stock.price * controller.purchasePercent || expendable)
+                            if (finalPost.currencies[cGood.currencyID] >= stock.price * controller.purchasePercent || expendable)
                             {//if has enough money to buy the item
                                 number--;//remove stock from hold
                                 spaceRemaining += cGood.mass;//increase space remaining								
@@ -74,8 +73,9 @@ namespace CallumP.TradeSys
 
                                 if (!expendable)
                                 {//only need to sort prices if not expendable
-                                    finalPost.cash -= cost;//pay for item
-                                    cash += cost;//receive money
+                                    int cID = cGood.currencyID;
+                                    finalPost.currencies[cID] -= cost;//pay for item
+                                    currencies[cID] += cost;//receive money
                                     if (controller.priceUpdates)//if update after each trade
                                         finalPost.UpdateSinglePrice(g, i);//update the price
                                 }//end not expendable so sort prices
@@ -121,7 +121,7 @@ namespace CallumP.TradeSys
                     for (int m2 = 0; m2 < manufacture[m1].manufacture.Count; m2++)
                     {//go through manufacture processes
                         RunMnfctr cMan = manufacture[m1].manufacture[m2];
-                        if (cMan.enabled && !cMan.running && cash - cMan.price > 0)
+                        if (cMan.enabled && !cMan.running && currencies[cMan.currencyID] - cMan.price > 0)
                         {
                             //check that the process is allowed and not currently running and has enough cash
                             if (ResourceCheck(m1, m2))
@@ -160,7 +160,7 @@ namespace CallumP.TradeSys
             Mnfctr process = controller.manufacture[groupID].manufacture[processID];//the manufacturing process in the controller
             RunMnfctr traderMan = manufacture[groupID].manufacture[processID];//the manufacturing process at the trade post
 
-            cash -= traderMan.price;//remove the amount of money required to run the process
+            currencies[traderMan.currencyID] -= traderMan.price;//remove the amount of money required to run the process
 
             //needs to pause before removing the items here so that they dont appear later on, potentially after the trader has been to a trade post
 

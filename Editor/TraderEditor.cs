@@ -25,7 +25,6 @@ namespace CallumP.TradeSys
         private SerializedProperty smallScroll;
         private SerializedProperty targetPost;
         private SerializedProperty cargoSpace;
-        private SerializedProperty cash;
         private SerializedProperty closeDistance;
         private SerializedProperty collect;
         private SerializedProperty item;
@@ -54,7 +53,6 @@ namespace CallumP.TradeSys
 
             targetPost = traderSO.FindProperty("target");
             cargoSpace = traderSO.FindProperty("cargoSpace");
-            cash = traderSO.FindProperty("cash");
             closeDistance = traderSO.FindProperty("closeDistance");
             collect = traderSO.FindProperty("allowCollect");
 
@@ -155,17 +153,9 @@ namespace CallumP.TradeSys
                         EditorGUILayout.BeginHorizontal();
                         EditorGUILayout.PropertyField(cargoSpace, new GUIContent("Cargo space", "This is the amount of space available to the trader"));
 
-                        if (!expendable)//if not expendable, then show credits
-                            EditorGUILayout.PropertyField(cash, new GUIContent("Credits", "The amount of money that the trader has in order to purchase goods. Make sure that the trader has enough money to be able to make purchases!"));
-                        else
-                            EditorGUILayout.LabelField("");
-
                         EditorGUILayout.EndHorizontal();
                         if (cargoSpace.floatValue < 0.000001f)
                             cargoSpace.floatValue = 0.000001f;
-
-                        if (cash.floatValue < 0)
-                            cash.floatValue = 0;
 
                         if (controllerNormal.pickUp)//only need to show this if is enabled in the controller
                             EditorGUILayout.PropertyField(collect, new GUIContent("Allow collection", "If enabled, will allow this trader to collect dropped items"));
