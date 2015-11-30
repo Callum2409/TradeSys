@@ -629,6 +629,11 @@ namespace CallumP.TradeSys
 
                                 if (currencies.arraySize > 1 && GUITools.PlusMinus(false))
                                 { //if remove
+
+                                    //remove or highlight from all currency exchanges
+                                    //remove from all trade posts
+                                    //remove from all traders
+
                                     currencies.DeleteArrayElementAtIndex(c);
                                     break;
                                 }//end if remove
@@ -976,11 +981,17 @@ namespace CallumP.TradeSys
                                 EditorGUILayout.EndHorizontal();
                             }
 
+                            int currencyID = currentGood.FindPropertyRelative("currencyID").intValue;
+
                             if (!expendable)
                             {//only show the prices if not expendable
                                 EditorGUILayout.BeginHorizontal();
                                 EditorGUILayout.LabelField("Prices", EditorStyles.boldLabel);//bold prices label for sub section
-                                currentGood.FindPropertyRelative("currencyID").intValue = EditorGUILayout.Popup(currentGood.FindPropertyRelative("currencyID").intValue, controllerNormal.currencyNames, "MiniPullDown");
+                                
+                                GUI.color = (currencyID < controllerNormal.currencies.Count) ? Color.white : Color.red;
+                                currencyID = EditorGUILayout.Popup(currencyID, controllerNormal.currencyNames, "MiniPullDown");
+                                GUI.color = Color.white;
+
                                 EditorGUILayout.EndHorizontal();
                                 EditorGUI.indentLevel = 2;
                                 EditorGUILayout.BeginHorizontal();
@@ -1011,10 +1022,17 @@ namespace CallumP.TradeSys
                             //set mas to be > base
 
                             //sort out the decimal places
-                            int decimals = controllerNormal.currencies[currentGood.FindPropertyRelative("currencyID").intValue].decimals;
-                            mi = (float)System.Math.Round(mi, decimals, System.MidpointRounding.AwayFromZero);
-                            ma = (float)System.Math.Round(ma, decimals, System.MidpointRounding.AwayFromZero);
-                            ba = (float)System.Math.Round(ba, decimals, System.MidpointRounding.AwayFromZero);
+                            if (currencyID < controllerNormal.currencies.Count)
+                            {
+                                int decimals = controllerNormal.currencies[currencyID].decimals;
+                                mi = (float)System.Math.Round(mi, decimals, System.MidpointRounding.AwayFromZero);
+                                ma = (float)System.Math.Round(ma, decimals, System.MidpointRounding.AwayFromZero);
+                                ba = (float)System.Math.Round(ba, decimals, System.MidpointRounding.AwayFromZero);
+                            }
+                           // else
+                            //    currencyID = Mathf.Max(0, currencyID-1);
+
+                            currentGood.FindPropertyRelative("currencyID").intValue = currencyID;
 
                             //set the prices
                             currentGood.FindPropertyRelative("minPrice").floatValue = mi;

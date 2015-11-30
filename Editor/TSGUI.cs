@@ -476,11 +476,20 @@ namespace CallumP.TradeSys
 
         bool CorrectEnabled(SerializedProperty check, SerializedObject obj, bool post)
         {//go through all needing and making lists, checking that the correct items have been enabled to allow manufacture
-            SerializedProperty currentNeeding = check.FindPropertyRelative("needing");
-            for (int n = 0; n < currentNeeding.arraySize; n++)
+            SerializedProperty currentNM = check.FindPropertyRelative("needing");
+            for (int n = 0; n < currentNM.arraySize; n++)
             {//go through all needing lists
-                if (!IsEnabled(currentNeeding.GetArrayElementAtIndex(n).FindPropertyRelative("itemID").intValue,
-                currentNeeding.GetArrayElementAtIndex(n).FindPropertyRelative("groupID").intValue, true, obj, post))
+                if (!IsEnabled(currentNM.GetArrayElementAtIndex(n).FindPropertyRelative("itemID").intValue,
+                currentNM.GetArrayElementAtIndex(n).FindPropertyRelative("groupID").intValue, true, obj, post))
+                    return false;
+            }
+
+            //check the making list is correct
+            currentNM = check.FindPropertyRelative("making");
+            for (int m = 0; m < currentNM.arraySize; m++)
+            {//go through all needing lists
+                if (!IsEnabled(currentNM.GetArrayElementAtIndex(m).FindPropertyRelative("itemID").intValue,
+                currentNM.GetArrayElementAtIndex(m).FindPropertyRelative("groupID").intValue, false, obj, post))
                     return false;
             }
             return true;
@@ -491,20 +500,15 @@ namespace CallumP.TradeSys
             if (post)
             {//if post
                 SerializedProperty checking = obj.FindProperty("stock").GetArrayElementAtIndex(groupID).FindPropertyRelative("stock").GetArrayElementAtIndex(itemID);
-
-                //postNormal.stock [groupID].stock [itemID];
+                if (groupID == -1 || itemID == -1)
+                    return false;
                 if (checking.FindPropertyRelative("hidden").boolValue)//if the item is hidden, then count as enabled
                     return true;
-                if (needing)//if the item is in the needing, post needs to be able to buy the item
-                    return checking.FindPropertyRelative("buy").boolValue;
-                else//else if in the making, needs to be able to sell
-                    return checking.FindPropertyRelative("sell").boolValue;
-
+                //if item in needing, check that can buy or if making, check can sell
+                return checking.FindPropertyRelative(needing ? "buy" : "sell").boolValue;
             }
-            else
-            {//else if trader
+            else //else is trader
                 return obj.FindProperty("items").GetArrayElementAtIndex(groupID).FindPropertyRelative("items").GetArrayElementAtIndex(itemID).FindPropertyRelative("enabled").boolValue;
-            }//end else trader
         }//end IsEnabled
 
         bool ShowGroup(SerializedProperty check, SerializedObject obj, bool post)

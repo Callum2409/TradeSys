@@ -194,17 +194,7 @@ namespace CallumP.TradeSys
 
                                 if (GUITools.TitleButton(new GUIContent(currentGroup.FindPropertyRelative("name").stringValue), currentGroup.FindPropertyRelative("expandedP"), "BoldLabel"))
                                 {//if foldout for goods group open
-
-                                    bool[][] before = new bool[stockGroup.arraySize][];//an array containing all of the enabled or disabled selection
-                                    for (int b = 0; b < stockGroup.arraySize; b++)
-                                    {//go through items in stock group
-                                        before[b] = new bool[3];
-                                        before[b][0] = stockGroup.GetArrayElementAtIndex(b).FindPropertyRelative("buy").boolValue;
-                                        before[b][1] = stockGroup.GetArrayElementAtIndex(b).FindPropertyRelative("sell").boolValue;
-                                        before[b][2] = stockGroup.GetArrayElementAtIndex(b).FindPropertyRelative("hidden").boolValue;
-                                    }//end for all in group
-
-                                    GUITools.IndentGroup(1);
+                                     GUITools.IndentGroup(1);
                                     EditorGUILayout.BeginHorizontal();
 
                                     EditorGUILayout.BeginVertical();
@@ -347,27 +337,6 @@ namespace CallumP.TradeSys
                                             EditorGUILayout.EndHorizontal();
                                         EditorGUI.indentLevel = 1;
                                     }//end for all goods
-
-                                    //needs to go through all items and see if any had BSH changes
-                                    for (int s = 0; s < stockGroup.arraySize; s++)
-                                    {//go through all items
-                                     //use the enabled or disabled selection to find what has changed
-                                     //this is so that if the hidden option is pressed, buy and sell are disabled
-                                     //but if buy or sell are pressed, then hidden becomes disabled
-                                     //also needs to check that can trade as currency has been selected
-
-                                        if (postNormal.currencies[controllerNormal.goods[g].goods[s].currencyID] != -1)
-                                        {//if currency enabled
-                                            if ((stockGroup.GetArrayElementAtIndex(s).FindPropertyRelative("buy").boolValue && !before[s][0]) || (stockGroup.GetArrayElementAtIndex(s).FindPropertyRelative("sell").boolValue && !before[s][1]))
-                                                //if buy or sell have just been enabled
-                                                stockGroup.GetArrayElementAtIndex(s).FindPropertyRelative("hidden").boolValue = false;
-                                            if (stockGroup.GetArrayElementAtIndex(s).FindPropertyRelative("hidden").boolValue && !before[s][2])
-                                                //if hidden has been enabled
-                                                stockGroup.GetArrayElementAtIndex(s).FindPropertyRelative("buy").boolValue = stockGroup.GetArrayElementAtIndex(s).FindPropertyRelative("sell").boolValue = false;
-                                        }//end if currency enabled
-                                        else  //else need to make false
-                                            stockGroup.GetArrayElementAtIndex(s).FindPropertyRelative("buy").boolValue = stockGroup.GetArrayElementAtIndex(s).FindPropertyRelative("sell").boolValue = stockGroup.GetArrayElementAtIndex(s).FindPropertyRelative("hidden").boolValue = false;
-                                    }//end for all items
                                 }//end if group open
                                 EditorGUI.indentLevel = 0;
                                 EditorGUILayout.LabelField("", "", "PopupCurveSwatchBackground", GUILayout.MaxHeight(0f));
