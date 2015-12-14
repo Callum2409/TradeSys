@@ -502,10 +502,8 @@ namespace CallumP.TradeSys
                 SerializedProperty checking = obj.FindProperty("stock").GetArrayElementAtIndex(groupID).FindPropertyRelative("stock").GetArrayElementAtIndex(itemID);
                 if (groupID == -1 || itemID == -1)
                     return false;
-                if (checking.FindPropertyRelative("hidden").boolValue)//if the item is hidden, then count as enabled
-                    return true;
-                //if item in needing, check that can buy or if making, check can sell
-                return checking.FindPropertyRelative(needing ? "buy" : "sell").boolValue;
+                return checking.FindPropertyRelative("hidden").boolValue || checking.FindPropertyRelative(needing ? "buy" : "sell").boolValue;
+                //if hidden, will return true, otherwise, if item in needing, check that can buy or if making, check can sell
             }
             else //else is trader
                 return obj.FindProperty("items").GetArrayElementAtIndex(groupID).FindPropertyRelative("items").GetArrayElementAtIndex(itemID).FindPropertyRelative("enabled").boolValue;
@@ -579,11 +577,6 @@ namespace CallumP.TradeSys
             return scrollPos;//need to return this so that scrolling work
         }//end EnableDisableGoods
 
-        public void GetCurrencyNames(Controller controller)
-        { //get the names of all of the currencies
-            controller.currencyNames = controller.currencies.Select(c => c.plural).ToArray<string>(); ;//get an array of all of the currency names
-        }//end GetCurrencyNames
-
         public Vector2 PTCur(bool TP, Controller controller, SerializedObject controllerSO, Vector2 scrollPos, SerializedProperty currencies, SerializedProperty exchanges)
         { //show the currency tab for the trade post and trader
 
@@ -607,7 +600,7 @@ namespace CallumP.TradeSys
                 EnableDisable(exchanges, "", false);
             }
 
-            GetCurrencyNames(controller);//update the currency names
+            controller.GetCurrencyNames();//update the currency names
 
             scrollPos = StartScroll(scrollPos, controllerSO.FindProperty("smallScroll"));
 

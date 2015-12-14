@@ -355,6 +355,8 @@ namespace CallumP.TradeSys
             if (currencies.Count < 1)//if not one currency
                 currencies.Add(new Currency() { single = "Credit", plural = "Credits" });
 
+            GetCurrencyNames();
+
             if (factions && groups != null)
                 return;//no need to do anything if not null
 
@@ -1227,5 +1229,10 @@ namespace CallumP.TradeSys
             //if not returned a value, return 0 as is not allowed
             return 0;
         }//end GetExchangeRate
+
+        public void GetCurrencyNames()
+        { //get the names of all of the currencies
+            currencyNames = currencies.Select(c => c.plural).ToArray<string>(); ;//get an array of all of the currency names
+        }//end GetCurrencyNames
     }//end Controller
 }//end namespace

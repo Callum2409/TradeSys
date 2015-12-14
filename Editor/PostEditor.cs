@@ -124,40 +124,6 @@ namespace CallumP.TradeSys
 
                 #region currencies
                 case 1:
-                    /*controllerNormal.selected.PC = GUITools.Toolbar(controllerNormal.selected.PC, new string[] { "Currencies", "Exchange" });
-                    int cur = controllerNormal.selected.PC;
-
-                    GUITools.HorizVertOptions(controllerSO.FindProperty("showHoriz"));//show a horiz vert option
-
-                    EditorGUILayout.BeginHorizontal();//show a select all/none button for both the currencies and exchanges
-
-                    if (cur == 0)
-                        EditorGUILayout.LabelField(new GUIContent("Enable currencies", "Allow trade post to use currencies. If currency disabled that an item is set to use, will not be available for trade"));
-                    else
-                        EditorGUILayout.LabelField(new GUIContent("Enable exchanges", "Allow trade post to have exchanges. Exchange cannot be enabled if the currency is not enabled"));
-
-                    GUITools.EnableDisable(cur == 0 ? currencies : exchanges, "", false);
-
-                    GUITools.GetCurrencyNames(controllerNormal);//update the currency names
-
-                    scrollPos.PC = GUITools.StartScroll(scrollPos.PC, smallScroll);
-
-                    List<CurrencyExchange> curEx = controllerNormal.currencyExchange;//get the currency exchanges
-                    List<bool> curNorm = postNormal.currencies;//get the currencies in the normal post
-
-                    string[] currencyNames = controllerNormal.currencyNames;
-                    string[] exchangeNames = new string[curEx.Count];//create an array for the exchange names
-                    for (int n = 0; n < exchangeNames.Length; n++)
-                    {//go through all exchanges
-                        CurrencyExchange thisEx = curEx[n];
-                        exchangeNames[n] = string.Format("{0} {1} {2}", currencyNames[thisEx.IDA], thisEx.reverse ? "\u2194" : "\u2192", currencyNames[thisEx.IDB]);//create the name of the exchange to display
-
-                        if (!curNorm[thisEx.IDA] || !curNorm[thisEx.IDB])//if one of the exchanges has the currency disabled, dont allow it to be selected
-                            exchanges.GetArrayElementAtIndex(n).boolValue = false;
-                    }//end for all exchanges
-
-                    GUITools.HorizVertDisplay(cur == 0 ? currencyNames : exchangeNames, cur == 0 ? currencies : exchanges, controllerSO.FindProperty("showHoriz").boolValue);*/
-
                     scrollPos.PC = GUITools.PTCur(true, controllerNormal, controllerSO, scrollPos.PC, currencies, exchanges);
                     break;
                 #endregion
@@ -194,7 +160,7 @@ namespace CallumP.TradeSys
 
                                 if (GUITools.TitleButton(new GUIContent(currentGroup.FindPropertyRelative("name").stringValue), currentGroup.FindPropertyRelative("expandedP"), "BoldLabel"))
                                 {//if foldout for goods group open
-                                     GUITools.IndentGroup(1);
+                                    GUITools.IndentGroup(1);
                                     EditorGUILayout.BeginHorizontal();
 
                                     EditorGUILayout.BeginVertical();
@@ -252,9 +218,15 @@ namespace CallumP.TradeSys
 
                                         GUILayout.Space(10f);
 
+                                        GUI.enabled = currencies.GetArrayElementAtIndex(controllerNormal.goods[g].goods[s].currencyID).floatValue > -1;//GUI enabled if currency > -1, meaning enabled
                                         currentStock.FindPropertyRelative("buy").boolValue = EditorGUILayout.Toggle(GUIContent.none, currentStock.FindPropertyRelative("buy").boolValue, GUILayout.Width(15f));
                                         currentStock.FindPropertyRelative("sell").boolValue = EditorGUILayout.Toggle(GUIContent.none, currentStock.FindPropertyRelative("sell").boolValue, GUILayout.Width(15f));
                                         currentStock.FindPropertyRelative("hidden").boolValue = EditorGUILayout.Toggle(GUIContent.none, currentStock.FindPropertyRelative("hidden").boolValue, GUILayout.Width(15f));
+
+                                        if (!GUI.enabled)//if GUI not enabled, mark the items as unchecked
+                                            currentStock.FindPropertyRelative("buy").boolValue = currentStock.FindPropertyRelative("sell").boolValue = currentStock.FindPropertyRelative("hidden").boolValue = false;
+
+                                        GUI.enabled = true;//re enable the GUI
 
                                         if (GoodEnabled(currentStock))
                                             currentStock.FindPropertyRelative("minMax").boolValue = EditorGUILayout.Toggle(GUIContent.none, currentStock.FindPropertyRelative("minMax").boolValue, GUILayout.Width(15f));

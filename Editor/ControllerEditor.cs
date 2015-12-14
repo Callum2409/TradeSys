@@ -165,7 +165,7 @@ namespace CallumP.TradeSys
             int[] groupLengthsG = new int[goods.arraySize];//contains the length of each group, so can convert between int and groupID and itemID
 
             controllerNormal.allNames = new string[controllerNormal.goods.Count][];//an array of names of goods in groups
-            GUITools.GetCurrencyNames(controllerNormal);
+            controllerNormal.GetCurrencyNames();
 
             for (int g1 = 0; g1 < goods.arraySize; g1++)
             {//go through all groups
@@ -596,7 +596,7 @@ namespace CallumP.TradeSys
                                 int index = currencies.arraySize;
                                 currencies.InsertArrayElementAtIndex(index);
                                 SerializedProperty newCur = currencies.GetArrayElementAtIndex(index);
-                                newCur.FindPropertyRelative("single").stringValue = newCur.FindPropertyRelative("plural").stringValue = "New currency";
+                                newCur.FindPropertyRelative("single").stringValue = newCur.FindPropertyRelative("plural").stringValue = "New currency " + index;
                                 newCur.FindPropertyRelative("formatString").stringValue = "{0} {1}";
                                 newCur.FindPropertyRelative("decimals").intValue = 0;
                                 newCur.FindPropertyRelative("expanded").boolValue = currencies.GetArrayElementAtIndex(index - 1).FindPropertyRelative("expanded").boolValue;
@@ -635,6 +635,14 @@ namespace CallumP.TradeSys
                                     //remove from all traders
 
                                     currencies.DeleteArrayElementAtIndex(c);
+
+                                    for (int g = 0; g < controllerNormal.goods.Count; g++)//for all goods
+                                        for (int i = 0; i < controllerNormal.goods[g].goods.Count; i++)//for all items
+                                            if (controllerNormal.goods[g].goods[i].currencyID >= c)//if is greater or equal to currency removed
+                                                goods.GetArrayElementAtIndex(g).FindPropertyRelative("goods").GetArrayElementAtIndex(i).FindPropertyRelative("currencyID").intValue--;
+
+                                    GUIUtility.keyboardControl = 0;
+
                                     break;
                                 }//end if remove
                                 EditorGUILayout.EndHorizontal();
@@ -678,7 +686,7 @@ namespace CallumP.TradeSys
                             EditorGUILayout.LabelField("Number of currency exchanges:", exchange.arraySize.ToString());
                             GUILayout.FlexibleSpace();
 
-                            if(GUITools.PlusMinus(true))
+                            if (GUITools.PlusMinus(true))
                             { //if add new exchange
                                 int index = exchange.arraySize;
                                 exchange.InsertArrayElementAtIndex(index);
@@ -722,7 +730,7 @@ namespace CallumP.TradeSys
 
                                 EditorGUILayout.PropertyField(curEx.FindPropertyRelative("reverse"), new GUIContent("", "Allow the exchange to operate in reverse"), GUILayout.Width(15f));
 
-                                if(GUITools.PlusMinus(false))
+                                if (GUITools.PlusMinus(false))
                                 {
                                     exchange.DeleteArrayElementAtIndex(e);
                                     break;
@@ -987,10 +995,8 @@ namespace CallumP.TradeSys
                             {//only show the prices if not expendable
                                 EditorGUILayout.BeginHorizontal();
                                 EditorGUILayout.LabelField("Prices", EditorStyles.boldLabel);//bold prices label for sub section
-                                
-                                GUI.color = (currencyID < controllerNormal.currencies.Count) ? Color.white : Color.red;
+
                                 currencyID = EditorGUILayout.Popup(currencyID, controllerNormal.currencyNames, "MiniPullDown");
-                                GUI.color = Color.white;
 
                                 EditorGUILayout.EndHorizontal();
                                 EditorGUI.indentLevel = 2;
@@ -1029,7 +1035,7 @@ namespace CallumP.TradeSys
                                 ma = (float)System.Math.Round(ma, decimals, System.MidpointRounding.AwayFromZero);
                                 ba = (float)System.Math.Round(ba, decimals, System.MidpointRounding.AwayFromZero);
                             }
-                           // else
+                            // else
                             //    currencyID = Mathf.Max(0, currencyID-1);
 
                             currentGood.FindPropertyRelative("currencyID").intValue = currencyID;
@@ -1865,9 +1871,10 @@ namespace CallumP.TradeSys
             if (a1 == b1)
                 return true;//return true if both the same on same exchange
 
-            for(int e = 0; e<exchange.arraySize; e++)
+            for (int e = 0; e < exchange.arraySize; e++)
             { //go through all, making sure not duplicated
-                if(e != index) { //if not the same as the one to be checked
+                if (e != index)
+                { //if not the same as the one to be checked
                     SerializedProperty ex = exchange.GetArrayElementAtIndex(e);
                     int a2 = ex.FindPropertyRelative("IDA").intValue;
                     int b2 = ex.FindPropertyRelative("IDB").intValue;
