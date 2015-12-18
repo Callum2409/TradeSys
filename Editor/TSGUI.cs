@@ -408,7 +408,6 @@ namespace CallumP.TradeSys
 
                                 if (CorrectEnabled(cManC, obj, post))
                                 {
-
                                     if (p == 0)
                                         EditorGUI.indentLevel = 0;
                                     EditorGUILayout.LabelField("", "", "PopupCurveSwatchBackground", GUILayout.MaxHeight(0f));

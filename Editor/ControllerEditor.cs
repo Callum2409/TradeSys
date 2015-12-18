@@ -600,6 +600,9 @@ namespace CallumP.TradeSys
                                 newCur.FindPropertyRelative("formatString").stringValue = "{0} {1}";
                                 newCur.FindPropertyRelative("decimals").intValue = 0;
                                 newCur.FindPropertyRelative("expanded").boolValue = currencies.GetArrayElementAtIndex(index - 1).FindPropertyRelative("expanded").boolValue;
+
+                                PTCur(postScripts, true, index);
+                                PTCur(traderScripts, true, index);
                             }//end if added currency
 
                             GUITools.ExpandCollapse(currencies, "expanded", true);
@@ -631,15 +634,48 @@ namespace CallumP.TradeSys
                                 { //if remove
 
                                     //remove or highlight from all currency exchanges
-                                    //remove from all trade posts
-                                    //remove from all traders
 
-                                    currencies.DeleteArrayElementAtIndex(c);
+                                    currencies.DeleteArrayElementAtIndex(c);//delete the currency
 
-                                    for (int g = 0; g < controllerNormal.goods.Count; g++)//for all goods
-                                        for (int i = 0; i < controllerNormal.goods[g].goods.Count; i++)//for all items
-                                            if (controllerNormal.goods[g].goods[i].currencyID >= c)//if is greater or equal to currency removed
-                                                goods.GetArrayElementAtIndex(g).FindPropertyRelative("goods").GetArrayElementAtIndex(i).FindPropertyRelative("currencyID").intValue--;
+                                    PTCur(postScripts, false, c);
+                                    PTCur(traderScripts, false, c);
+
+                                    if (c == currencies.arraySize)
+                                    {//only need to reduce if deleted currency was at end of array
+                                     //sort controller goods
+                                        for (int g = 0; g < controllerNormal.goods.Count; g++)//for all goods
+                                            for (int i = 0; i < controllerNormal.goods[g].goods.Count; i++)//for all items
+                                                if (controllerNormal.goods[g].goods[i].currencyID >= c)//if is greater or equal to currency removed
+                                                    goods.GetArrayElementAtIndex(g).FindPropertyRelative("goods").GetArrayElementAtIndex(i).FindPropertyRelative("currencyID").intValue--;
+
+                                        //sort p, t manufacturing
+                                        for (int m = 0; m < controllerNormal.manufacture.Count; m++)
+                                        {//for all manufacturing groups
+                                            for (int p = 0; p < controllerNormal.manufacture[m].manufacture.Count; p++)
+                                            {//for all manufacturing processes
+                                                for (int tp = 0; tp < postScripts.Length; tp++)
+                                                {//for all trade posts
+                                                    SerializedProperty curID = postScripts[tp].FindProperty("manufacture").GetArrayElementAtIndex(m).FindPropertyRelative("manufacture").GetArrayElementAtIndex(p).FindPropertyRelative("currencyID");
+                                                    if (curID.intValue >= c)//if is greater or equal to currency removed
+                                                        curID.intValue--;//reduce
+                                                }//end for all posts
+                                                for (int t = 0; t < traderScripts.Length; t++)
+                                                {//for all traders
+                                                    SerializedProperty curID = traderScripts[t].FindProperty("manufacture").GetArrayElementAtIndex(m).FindPropertyRelative("manufacture").GetArrayElementAtIndex(p).FindPropertyRelative("currencyID");
+                                                    if (curID.intValue >= c)//if is greater or equal to currency removed
+                                                        curID.intValue--;//reduce
+                                                }//end for all traders
+                                            }//end for all processes
+                                        }//end for all groups
+                                    }//end if last currency
+
+                                    for (int e = 0; e < exchange.arraySize; e++)
+                                    { //for all exchanges
+                                        if (exchange.GetArrayElementAtIndex(e).FindPropertyRelative("IDA").intValue >= c)
+                                            exchange.GetArrayElementAtIndex(e).FindPropertyRelative("IDA").intValue--;
+                                        if (exchange.GetArrayElementAtIndex(e).FindPropertyRelative("IDB").intValue >= c)
+                                            exchange.GetArrayElementAtIndex(e).FindPropertyRelative("IDB").intValue--;
+                                    }//end for all excahanges
 
                                     GUIUtility.keyboardControl = 0;
 
@@ -677,6 +713,7 @@ namespace CallumP.TradeSys
                                     EditorGUILayout.EndVertical();
                                 }//end if expanded
                             }//end for all currencies
+                            controllerNormal.GetCurrencyNames();//update the names if necessary
                             if (currencies.arraySize > 0)
                                 EditorGUILayout.LabelField("", "", "PopupCurveSwatchBackground", GUILayout.MaxHeight(0f));
                             break;
@@ -694,6 +731,9 @@ namespace CallumP.TradeSys
                                 newEx.FindPropertyRelative("numberA").floatValue = newEx.FindPropertyRelative("numberB").floatValue = 1;
                                 newEx.FindPropertyRelative("IDA").intValue = newEx.FindPropertyRelative("IDB").intValue = 0;
                                 newEx.FindPropertyRelative("reverse").boolValue = false;
+
+                                PTEx(postScripts, true, index);
+                                PTEx(traderScripts, true, index);
                             }//end add new exchange
                             EditorGUILayout.EndHorizontal();
 
@@ -733,6 +773,9 @@ namespace CallumP.TradeSys
                                 if (GUITools.PlusMinus(false))
                                 {
                                     exchange.DeleteArrayElementAtIndex(e);
+
+                                    PTEx(postScripts, false, e);
+                                    PTEx(traderScripts, false, e);
                                     break;
                                 }//end if remove pressed
                                 EditorGUILayout.EndHorizontal();
@@ -1888,5 +1931,32 @@ namespace CallumP.TradeSys
 
             return false;
         }//end ExchangeIssue
+
+        void PTCur(SerializedObject[] postsTraders, bool add, int index) { //add or remove a currency from posts and traders
+                                                                           //sort traders
+            for (int pt = 0; pt < postsTraders.Length; pt++)
+            { //for all
+                if (add)
+                {
+                    postsTraders[pt].FindProperty("currencies").InsertArrayElementAtIndex(index);//add a currency
+                    postsTraders[pt].FindProperty("currencies").GetArrayElementAtIndex(index).floatValue = 0;//set to 0
+                }
+                else
+                    postsTraders[pt].FindProperty("currencies").InsertArrayElementAtIndex(index);//add a currency
+            }//end for all
+        }//end PTCur
+
+        void PTEx(SerializedObject[] postsTraders, bool add, int index) { //add or remove an exchange from the posts and traders
+            for (int pt = 0; pt< postsTraders.Length; pt++)
+            {//for all
+                if (add)
+                {
+                    postsTraders[pt].FindProperty("exchanges").InsertArrayElementAtIndex(index);
+                    postsTraders[pt].FindProperty("exchanges").GetArrayElementAtIndex(index).boolValue = false;
+                }
+                else
+                    postsTraders[pt].FindProperty("exchanges").DeleteArrayElementAtIndex(index);
+            }//end for all
+        }//end PTEx
     }//end ControllerEditor
 }//end namespace
