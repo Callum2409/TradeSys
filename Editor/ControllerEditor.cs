@@ -632,9 +632,6 @@ namespace CallumP.TradeSys
 
                                 if (currencies.arraySize > 1 && GUITools.PlusMinus(false))
                                 { //if remove
-
-                                    //remove or highlight from all currency exchanges
-
                                     currencies.DeleteArrayElementAtIndex(c);//delete the currency
 
                                     PTCur(postScripts, false, c);
@@ -653,18 +650,8 @@ namespace CallumP.TradeSys
                                         {//for all manufacturing groups
                                             for (int p = 0; p < controllerNormal.manufacture[m].manufacture.Count; p++)
                                             {//for all manufacturing processes
-                                                for (int tp = 0; tp < postScripts.Length; tp++)
-                                                {//for all trade posts
-                                                    SerializedProperty curID = postScripts[tp].FindProperty("manufacture").GetArrayElementAtIndex(m).FindPropertyRelative("manufacture").GetArrayElementAtIndex(p).FindPropertyRelative("currencyID");
-                                                    if (curID.intValue >= c)//if is greater or equal to currency removed
-                                                        curID.intValue--;//reduce
-                                                }//end for all posts
-                                                for (int t = 0; t < traderScripts.Length; t++)
-                                                {//for all traders
-                                                    SerializedProperty curID = traderScripts[t].FindProperty("manufacture").GetArrayElementAtIndex(m).FindPropertyRelative("manufacture").GetArrayElementAtIndex(p).FindPropertyRelative("currencyID");
-                                                    if (curID.intValue >= c)//if is greater or equal to currency removed
-                                                        curID.intValue--;//reduce
-                                                }//end for all traders
+                                                PTMan(postScripts, m, p, c);
+                                                PTMan(traderScripts, m, p, c);                                                
                                             }//end for all processes
                                         }//end for all groups
                                     }//end if last currency
@@ -1958,5 +1945,15 @@ namespace CallumP.TradeSys
                     postsTraders[pt].FindProperty("exchanges").DeleteArrayElementAtIndex(index);
             }//end for all
         }//end PTEx
+
+        void PTMan(SerializedObject[] postsTraders, int groupID, int processID, int index)
+        {
+            for (int pt = 0; pt < postsTraders.Length; pt++)
+            {//for all 
+                SerializedProperty curID = postsTraders[pt].FindProperty("manufacture").GetArrayElementAtIndex(groupID).FindPropertyRelative("manufacture").GetArrayElementAtIndex(processID).FindPropertyRelative("currencyID");
+                if (curID.intValue >= index)//if is greater or equal to currency removed
+                    curID.intValue--;//reduce
+            }//end for all
+        }//end PTMan
     }//end ControllerEditor
 }//end namespace
