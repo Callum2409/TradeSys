@@ -82,16 +82,7 @@ namespace CallumP.TradeSys
             expendable = controllerNormal.expTraders.enabled;
 
             if (!expendable)
-            {//get traders if not expendable
-                controllerNormal.traders = GameObject.FindGameObjectsWithTag(Tags.T);
-                controllerNormal.traderScripts = new Trader[controllerNormal.traders.Length];
-                traderScripts = new SerializedObject[controllerNormal.traders.Length];
-                for (int t = 0; t < controllerNormal.traders.Length; t++)
-                {
-                    controllerNormal.traderScripts[t] = controllerNormal.traders[t].GetComponent<Trader>();
-                    traderScripts[t] = new SerializedObject(controllerNormal.traderScripts[t]);
-                }
-            }//end if not expendable
+                GetTraders();
 
             GameObject[] spawners = GameObject.FindGameObjectsWithTag(Tags.S);
             controllerNormal.spawners = new Spawner[spawners.Length];
@@ -408,7 +399,7 @@ namespace CallumP.TradeSys
                     SerializedProperty expanded = expTraders.FindPropertyRelative("expandedC");
                     SerializedProperty enabled = expTraders.FindPropertyRelative("enabled");
 
-                    bool before = controllerNormal.expTraders.enabled;
+                    bool before = expendable;
                     GUITools.TitleGroup(new GUIContent("Expendable traders", "Create traders to carry cargo from one trade post to another. The trader will be deleted when it arrives at its desitination"), expanded, false);
 
                     if (expanded.boolValue)
@@ -469,11 +460,15 @@ namespace CallumP.TradeSys
                                 EditorGUILayout.EndHorizontal();
                             }//end if showing something
                         }//end if enabled
+                        expendable = enabled.boolValue;//if expanded, update
                     }//end if expanded
                     EditorGUILayout.EndVertical();
 
-                    if (!before && expendable)
+                    if (before && !expendable)
+                    {
+                        GetTraders();
                         controllerNormal.SortTraders();//need to sort the traders if just enabled them again
+                    }
 
                     #endregion
 
@@ -1955,5 +1950,17 @@ namespace CallumP.TradeSys
                     curID.intValue--;//reduce
             }//end for all
         }//end PTMan
+
+        void GetTraders()
+        {//get the trader scripts
+            controllerNormal.traders = GameObject.FindGameObjectsWithTag(Tags.T);
+            controllerNormal.traderScripts = new Trader[controllerNormal.traders.Length];
+            traderScripts = new SerializedObject[controllerNormal.traders.Length];
+            for (int t = 0; t < controllerNormal.traders.Length; t++)
+            {
+                controllerNormal.traderScripts[t] = controllerNormal.traders[t].GetComponent<Trader>();
+                traderScripts[t] = new SerializedObject(controllerNormal.traderScripts[t]);
+            }
+        }//endTraders
     }//end ControllerEditor
 }//end namespace
