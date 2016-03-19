@@ -174,7 +174,6 @@ public class TSPlayer : MonoBehaviour
             if (CallumP.TagManagement.ObjectTags.GetTag(controller.postScripts[p].gameObject, "Post tags", 1))//if has the purchasable tag checked
                 purchasable.Add(controller.postScripts[p]);//add the trade post to the list of purchasable posts
         }//end for all posts
-        Debug.Log(purchasable.Count);
         scrollPos = GUI.BeginScrollView(new Rect(10, 100, Screen.width - 20, Screen.height - 110), scrollPos, new Rect(0, 0, 500, purchasable.Count * 30));
         //show all of the items inside a scroll view
 
