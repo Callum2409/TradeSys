@@ -11,7 +11,8 @@ namespace CallumP.TradeSys {//use namespace to stop any name conflicts
 		public int numberOfPosts;//set the number of posts
 		public float sphereRadius;//set how far away each post can be
 		public int numberOfTraders;//the number of traders
-		public int min = 0, max = 30;//the min and max number of items
+		public int minItems = 0, maxItems = 30;//the min and max number of items
+        public int minCurrency = 1000, maxCurrency = 5000;//the min and max of each currecny
 	
 		Controller controller;//the controller
 	
@@ -26,10 +27,13 @@ namespace CallumP.TradeSys {//use namespace to stop any name conflicts
 				newPost.transform.parent = GameObject.Find ("Posts").transform;//set the parent, so doesnt fill hierarchy
 				newPost.name = "Trade Post " + (n + 1);//set the name so is easier to find any later
 				controller.SortTradePost(newPost);//sort the new post information
+
+                for (int c = 0; c < controller.currencies.Count; c++)//go through each currency and give a random ammount
+                    newPost.currencies[c] = Random.Range(minCurrency, maxCurrency);
 			
 				for (int g = 0; g<controller.goods.Count; g++) {//go through all groups
 					for (int s = 0; s<controller.goods[g].goods.Count; s++)//go through all goods
-						newPost.stock [g].stock [s].number = Random.Range (min, max);//set the number of items. dont need to add because is sorted in the trade post script
+						newPost.stock [g].stock [s].number = Random.Range (minItems, maxItems);//set the number of items. dont need to add because is sorted in the trade post script
 				}//end for groups
 			
 				for (int m = 0; m<controller.manufacture.Count; m++) {//go through all manufacture groups
@@ -61,8 +65,11 @@ namespace CallumP.TradeSys {//use namespace to stop any name conflicts
 			
 				newTrader.closeDistance = 0.3f;//set the close distance
 				newTrader.transform.localScale = new Vector3 (0.25f, 0.25f, 0.25f);//scale the cubes so they are smaller than the trade post spheres
-			
-				SortTags(newTrader.gameObject, true);
+
+                for (int c = 0; c < controller.currencies.Count; c++)//go through each currency and give a random ammount
+                    newTrader.currencies[c] = Random.Range(minCurrency, maxCurrency);
+
+                SortTags(newTrader.gameObject, true);
 			}//end for new traders
 			#endregion
 

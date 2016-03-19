@@ -754,7 +754,7 @@ namespace CallumP.TradeSys
                     Debug.LogError(trader.name + " has no reachable posts! This may be due to incorrect factions or groups");
                     return false;
                 }
-                SendToPost(trader, reachable[Random.Range(0, reachable.Length)].post, true, 0);//send the trader to the post
+                SendToPost(trader, reachable[Random.Range(0, reachable.Length)].post, true, 0, true);//send the trader to the post
             }
             else//end check in the same faction as the trader
                 Debug.LogError(trader.name + " is not in the same faction as the starting trade post, so is not able to make any trades ");
@@ -911,10 +911,11 @@ namespace CallumP.TradeSys
             return quantity;
         }//end TradeQuantity
 
-        void SendToPost(Trader trader, int postID, bool empty, float time)
+        void SendToPost(Trader trader, int postID, bool empty, float time, bool random = false)
         {//send a trader to a post empty
-            if (trader.empty && empty && trader.startPost == postScripts[postID])
+            if (!random && trader.empty && empty && trader.startPost == postScripts[postID])
             {//if was empty and going back to the same post that it was at before
+                //but if from random selection, force go to this post
                 MoveToRandom(trader, trader.postID);//move to a new random post so doesnt get stuck
                 return;
             }//end if going back to where started and was empty
@@ -1222,8 +1223,8 @@ namespace CallumP.TradeSys
                 if (cEx.IDA == IDA && cEx.IDB == IDB)//if is simple A -> B
                     return cEx.multiplier;//return the multuplier
 
-                if(cEx.IDA == IDB && cEx.IDB == IDA && cEx.reverse)//if reverse is allowed
-                    return 1/cEx.multiplier;//return 1/ to get correct rate
+                if (cEx.IDA == IDB && cEx.IDB == IDA && cEx.reverse)//if reverse is allowed
+                    return 1 / cEx.multiplier;//return 1/ to get correct rate
             }//end for all exchanges
 
             //if not returned a value, return 0 as is not allowed
