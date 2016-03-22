@@ -77,6 +77,23 @@ namespace CallumP.TradeSys
 
         public override void OnInspectorGUI()
         {
+            if (expendable && !InExpendableList()) { //if expendble, is a prefab and not added to list, dont show any options, just a message
+                if (PrefabUtility.GetPrefabParent(traderNormal) == null) {//check is a prefab
+                    EditorGUILayout.HelpBox("No options can be changed as this is an expendble trader but is not listed in the controller.", MessageType.Error);
+                    if (GUILayout.Button("Add to expendable trader list")) //have button so can easily add
+                        controllerNormal.expTraders.traders.Add(traderNormal);//add to list
+                }//end if a prefab
+                else
+                    EditorGUILayout.HelpBox("This trader is not a prefab so no settings can be changed.", MessageType.Error);
+                return;//return so no options shown
+            }//end if expendable
+
+            if (!expendable && PrefabUtility.GetPrefabType(traderNormal) != PrefabType.None)
+            {//check is a prefab in a non expendable set up
+                EditorGUILayout.HelpBox("No options can be changed as this scene is not set up to contain expendable traders. Change options in the controller to allow expendable traders to allow option changing.", MessageType.Error);
+                return;//need to return to not show options
+            }
+
             Undo.RecordObject(traderNormal, "TradeSys Trader");
             EditorGUIUtility.fieldWidth = 30f;
 
@@ -217,5 +234,15 @@ namespace CallumP.TradeSys
             controllerSO.ApplyModifiedProperties();
             controllerNormal.selected.T = sel;
         }//end OnInspectorGUI
+
+        bool InExpendableList()
+        {//go through list and see if the trader is in the expendable list if expendable
+            for (int t = 0; t < controllerNormal.expTraders.traders.Count; t++)
+            {
+                if (controllerNormal.expTraders.traders[t] == traderNormal)//if is this
+                    return true;
+            }//end for all traders
+            return false;
+        }//end InExpendableList
     }//end TraderEditor
 }//end namespace

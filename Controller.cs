@@ -150,6 +150,8 @@ namespace CallumP.TradeSys
                 Trader trader = traderScripts[t];
                 int postID = GetPostID(trader.target);
                 trader.postID = trader.homeID = postID;
+
+                if(!expTraders.enabled)//only need to get the start post if not expendable
                 trader.startPost = trader.finalPost = postScripts[postID];
             }//end go through traders
 
@@ -204,6 +206,16 @@ namespace CallumP.TradeSys
             for (int t = 0; t < traderCount; t++) //go through traders getting script
                 traderScripts[t] = traders[t].GetComponent<Trader>();
         }//end GetTraderScripts
+
+        public void GetExpTraderScripts()
+        {//get the ependable trader scripts
+            traderScripts = expTraders.traders.ToArray();
+            traderCount = traderScripts.Length;
+            traders = new GameObject[traderCount];
+
+            for (int t = 0; t < traderCount; t++) //go through traderScripts getting gameObejct
+                traders[t] = traderScripts[t].gameObject;
+        }//end GetExpTraderScripts
         #endregion
 
         public void GetClosest()
@@ -340,7 +352,10 @@ namespace CallumP.TradeSys
          //only do this if not in the editor
             GetPostScripts();
 
-            if (!expTraders.enabled)//if not expendable, get the trader scripts
+            //this gets called at the start, allowing all of the information used on the expendable traders to be correct
+            if (expTraders.enabled)//if not expendable, get the trader scripts
+                GetExpTraderScripts();
+            else
                 GetTraderScripts();
 
             SortController();

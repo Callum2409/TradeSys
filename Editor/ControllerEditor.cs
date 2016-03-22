@@ -81,7 +81,9 @@ namespace CallumP.TradeSys
 
             expendable = controllerNormal.expTraders.enabled;
 
-            if (!expendable)
+            if (expendable)
+                GetExpTraders();
+            else
                 GetTraders();
 
             GameObject[] spawners = GameObject.FindGameObjectsWithTag(Tags.S);
@@ -466,7 +468,8 @@ namespace CallumP.TradeSys
 
                     if (before && !expendable)
                     {
-                        GetTraders();
+                        GetTraders();//get the scripts and the serializedobjects
+                        controllerNormal.GetTraderScripts();//get the scripts and update the count
                         controllerNormal.SortTraders();//need to sort the traders if just enabled them again
                     }
 
@@ -646,7 +649,7 @@ namespace CallumP.TradeSys
                                             for (int p = 0; p < controllerNormal.manufacture[m].manufacture.Count; p++)
                                             {//for all manufacturing processes
                                                 PTMan(postScripts, m, p, c);
-                                                PTMan(traderScripts, m, p, c);                                                
+                                                PTMan(traderScripts, m, p, c);
                                             }//end for all processes
                                         }//end for all groups
                                     }//end if last currency
@@ -1292,9 +1295,8 @@ namespace CallumP.TradeSys
 
             for (int p = 0; p < postScripts.Length; p++)
                 postScripts[p].ApplyModifiedProperties();
-            if (!expendable)
-                for (int t = 0; t < traderScripts.Length; t++)
-                    traderScripts[t].ApplyModifiedProperties();
+            for (int t = 0; t < traderScripts.Length; t++)
+                traderScripts[t].ApplyModifiedProperties();
             for (int s = 0; s < spawnerScripts.Length; s++)
                 spawnerScripts[s].ApplyModifiedProperties();
         }//end OnInspectorGUI
@@ -1914,8 +1916,9 @@ namespace CallumP.TradeSys
             return false;
         }//end ExchangeIssue
 
-        void PTCur(SerializedObject[] postsTraders, bool add, int index) { //add or remove a currency from posts and traders
-                                                                           //sort traders
+        void PTCur(SerializedObject[] postsTraders, bool add, int index)
+        { //add or remove a currency from posts and traders
+          //sort traders
             for (int pt = 0; pt < postsTraders.Length; pt++)
             { //for all
                 if (add)
@@ -1928,8 +1931,9 @@ namespace CallumP.TradeSys
             }//end for all
         }//end PTCur
 
-        void PTEx(SerializedObject[] postsTraders, bool add, int index) { //add or remove an exchange from the posts and traders
-            for (int pt = 0; pt< postsTraders.Length; pt++)
+        void PTEx(SerializedObject[] postsTraders, bool add, int index)
+        { //add or remove an exchange from the posts and traders
+            for (int pt = 0; pt < postsTraders.Length; pt++)
             {//for all
                 if (add)
                 {
@@ -1954,13 +1958,34 @@ namespace CallumP.TradeSys
         void GetTraders()
         {//get the trader scripts
             controllerNormal.traders = GameObject.FindGameObjectsWithTag(Tags.T);
-            controllerNormal.traderScripts = new Trader[controllerNormal.traders.Length];
-            traderScripts = new SerializedObject[controllerNormal.traders.Length];
-            for (int t = 0; t < controllerNormal.traders.Length; t++)
+            int length = controllerNormal.traders.Length;
+            controllerNormal.traderScripts = new Trader[length];
+            traderScripts = new SerializedObject[length];
+            for (int t = 0; t < length; t++)
             {
                 controllerNormal.traderScripts[t] = controllerNormal.traders[t].GetComponent<Trader>();
                 traderScripts[t] = new SerializedObject(controllerNormal.traderScripts[t]);
             }
-        }//endTraders
+        }//end GetTraders
+
+        void GetExpTraders()
+        { //get the expendable trader scripts
+            controllerNormal.traderScripts = controllerNormal.expTraders.traders.ToArray();//only use the expendable traders previously definined
+
+            List<GameObject> GOs = new List<GameObject>();
+            List<SerializedObject> SOs = new List<SerializedObject>();
+
+            for (int t = 0; t < controllerNormal.traderScripts.Length; t++)
+            {
+                if (controllerNormal.traderScripts[t] != null)
+                {//check not null
+                    GOs.Add(controllerNormal.traderScripts[t].gameObject);
+                    SOs.Add(new SerializedObject(controllerNormal.traderScripts[t]));
+                }
+            }
+
+            controllerNormal.traders = GOs.ToArray();
+            traderScripts = SOs.ToArray();
+        }//end GetExpTraders
     }//end ControllerEditor
 }//end namespace
