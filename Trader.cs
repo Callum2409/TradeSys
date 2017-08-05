@@ -270,6 +270,7 @@ namespace CallumP.TradeSys
             {//if allowed to drop cargo
                 Item droppedItem = (Item)Instantiate(controller.goods[groupID].goods[itemID].itemCrate, transform.position, Quaternion.identity);//create the item
                                                                                                                                                  //set the details of the dropped item
+
                 droppedItem.groupID = groupID;
                 droppedItem.itemID = itemID;
                 droppedItem.number = Mathf.Min(number, items[groupID].items[itemID].number);//drop the min number
