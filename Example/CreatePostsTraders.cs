@@ -19,7 +19,7 @@ namespace CallumP.TradeSys {//use namespace to stop any name conflicts
 		// Use this for initialization
 		void Start () {
 			controller = GameObject.FindGameObjectWithTag (Tags.C).GetComponent<Controller> ();
-			Random.seed = seed;//set the seed
+			Random.InitState(seed);//set the seed
 			#region posts
 			for (int n = 0; n<numberOfPosts; n++) {//add new posts, setting them up   
 				TradePost newPost = GameObject.CreatePrimitive (PrimitiveType.Sphere).AddComponent<TradePost> ();//create the sphere

@@ -484,7 +484,7 @@ namespace CallumP.TradeSys {//use namespace to stop any name conflicts
 
                             string[] nameNo = new string[itemGroup.arraySize];
                             for (int i = 0; i < itemGroup.arraySize; i++)
-                                nameNo[i] = controllerNormal.allNames[g][i] + " (" + itemGroup.GetArrayElementAtIndex(0).FindPropertyRelative("number").intValue + ")";
+                                nameNo[i] = controllerNormal.allNames[g][i] + " (" + itemGroup.GetArrayElementAtIndex(i).FindPropertyRelative("number").intValue + ")";
 
                             HorizVertDisplay(nameNo, itemGroup, "enabled", controllerSO.FindProperty("showHoriz").boolValue, 1, true);
                         }//end if group open
