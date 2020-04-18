@@ -43,7 +43,7 @@ namespace CallumP.TradeSys
 						}//end for all groups
 						
 						if (specifySeed)//if specific seed set, then make seed. if not, then will use a random seed
-								Random.InitState(seed);
+								Random.seed = seed;
 						
 						StartCoroutine (Spawn ());
 				}//end Awake
