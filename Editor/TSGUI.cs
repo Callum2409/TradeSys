@@ -283,7 +283,7 @@ namespace CallumP.TradeSys {//use namespace to stop any name conflicts
         }//end IndentGroup
 
         public Vector2 StartScroll(Vector2 scrollPos, SerializedProperty enabled) {//draw a separating line, and if enabled, start a scroll view
-            EditorGUILayout.LabelField("", "", "ShurikenLine", GUILayout.MaxHeight(1f));//draw a separating line
+            EditorGUILayout.LabelField("", "", "EyeDropperHorizontalLine", GUILayout.MaxHeight(1f));//draw a separating line
             if (enabled.boolValue)//if smaller scroll views enabled
                 scrollPos = EditorGUILayout.BeginScrollView(scrollPos);
             return scrollPos;
