@@ -62,7 +62,7 @@ namespace CallumP.TradeSys {//use namespace to stop any name conflicts
         public void HorizVertOptions(SerializedProperty showHoriz) {//show the radio buttons for showing horizontally and vertically
             EditorGUILayout.BeginHorizontal();
             GUILayout.FlexibleSpace();
-            EditorGUILayout.LabelField(new GUIContent("Show items", "Show items ascending horizontally or vertically"), "MiniLabelRight");
+            EditorGUILayout.LabelField(new GUIContent("Show items", "Show items ascending horizontally or vertically"), "OL RightLabel");
 
             showHoriz.boolValue = GUILayout.Toggle(showHoriz.boolValue, new GUIContent("Horizontally", "Show items ascending horizontally"), EditorStyles.miniButtonLeft);
             showHoriz.boolValue = !GUILayout.Toggle(!(showHoriz.boolValue), new GUIContent("Vertically", "Show items ascending vertically"), EditorStyles.miniButtonRight);
